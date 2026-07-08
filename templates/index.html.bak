@@ -335,14 +335,14 @@
             <button class="filter-btn" data-type="planeswalker" onclick="App.setCollectionFilter('planeswalker')">Planeswalker</button>
             <button class="filter-btn" data-type="land" onclick="App.setCollectionFilter('land')">Land</button>
         </div>
+        <div id="collection-grid" class="card-grid"></div>
+        <div id="empty-collection" class="empty-state" style="display:none;">No cards in collection yet. Add a deck first!</div>
+        <div id="collection-no-results" class="empty-state" style="display:none;">No cards match your search.</div>
         <div class="filter-bar" style="margin-bottom:0.75rem;">
             <span class="label">Decks:</span>
             <button class="filter-btn active" id="deck-filter-all" onclick="App.toggleAllDecks()">All</button>
             <span id="deck-filter-list"></span>
         </div>
-        <div id="collection-grid" class="card-grid"></div>
-        <div id="empty-collection" class="empty-state" style="display:none;">No cards in collection yet. Add a deck first!</div>
-        <div id="collection-no-results" class="empty-state" style="display:none;">No cards match your search.</div>
     </div>
 
     <div id="deck-modal" class="modal-overlay">
@@ -388,9 +388,9 @@ var App = (function() {
     var currentTab = 'decks';
     var allCollectionCards = [];
     var allDeckCards = [];
-    var allDecks = [];
-    var enabledDeckIds = {};
     var collectionFilter = 'all';
+     var allDecks = [];
+     var enabledDeckIds = {};
     var currentCommanderName = '';
     var currentCommanderImage = '';
     var DECK_COLOR_PRESETS = [
@@ -939,15 +939,37 @@ var App = (function() {
             .then(function(res) { return res.json(); })
             .then(function(cards) {
                 allCollectionCards = cards;
-                filterCollection();
-            });
-        fetch('/api/decks')
-            .then(function(res) { return res.json(); })
-            .then(function(decks) {
-                allDecks = decks;
-                renderDeckFilters();
+                renderCollection(cards);
             });
     }
+     function loadCollection() {
+         fetch('/api/collection')
+             .then(function(res) { return res.json(); })
+             .then(function(cards) {
+                 allCollectionCards = cards;
+                 filterCollection();
+             });
+         fetch('/api/decks')
+             .then(function(res) { return res.json(); })
+             .then(function(decks) {
+                 allDecks = decks;
+                 renderDeckFilters();
+             });
+     }
+     function loadCollection() {
+         fetch('/api/collection')
+             .then(function(res) { return res.json(); })
+             .then(function(cards) {
+                 allCollectionCards = cards;
+                 filterCollection();
+             });
+         fetch('/api/decks')
+             .then(function(res) { return res.json(); })
+             .then(function(decks) {
+                 allDecks = decks;
+                 renderDeckFilters();
+             });
+     }
 
     function renderCollection(cards) {
         var grid = document.getElementById('collection-grid');
@@ -976,43 +998,6 @@ var App = (function() {
                 '<span class="card-qty">x' + c.total_quantity + '</span>' +
             '</div>';
         }).join('');
-    }
-
-        function renderDeckFilters() {
-        var list = document.getElementById('deck-filter-list');
-        if (!allDecks || allDecks.length === 0) { list.innerHTML = ''; return; }
-        var anyNew = false;
-        allDecks.forEach(function(d) {
-            if (enabledDeckIds[d.id] === undefined) {
-                enabledDeckIds[d.id] = true;
-                anyNew = true;
-            }
-        });
-        if (anyNew) {
-            document.getElementById('deck-filter-all').classList.add('active');
-        }
-        list.innerHTML = allDecks.map(function(d) {
-            var active = enabledDeckIds[d.id] ? ' active' : '';
-            return '<button class="filter-btn' + active + '" style="border-left:3px solid ' + escapeHtml(d.color) + ';" onclick="App.toggleDeckFilter(' + d.id + ')" title="' + escapeHtml(d.name) + '">' + escapeHtml(d.name) + '</button>';
-        }).join('');
-    }
-
-    function toggleDeckFilter(deckId) {
-        enabledDeckIds[deckId] = !enabledDeckIds[deckId];
-        renderDeckFilters();
-        var allOn = allDecks.every(function(d) { return enabledDeckIds[d.id]; });
-        var allBtn = document.getElementById('deck-filter-all');
-        if (allOn) { allBtn.classList.add('active'); } else { allBtn.classList.remove('active'); }
-        filterCollection();
-    }
-
-    function toggleAllDecks() {
-        var allOn = allDecks.every(function(d) { return enabledDeckIds[d.id]; });
-        var newState = !allOn;
-        allDecks.forEach(function(d) { enabledDeckIds[d.id] = newState; });
-        renderDeckFilters();
-        document.getElementById('deck-filter-all').classList.toggle('active', newState);
-        filterCollection();
     }
 
     function filterCollection() {
@@ -1119,9 +1104,7 @@ var App = (function() {
         refreshAllImages: refreshAllImages,
         pollDeckImages: pollDeckImages,
         setTheme: setTheme,
-        toggleFoil: toggleFoil,
-        toggleDeckFilter: toggleDeckFilter,
-        toggleAllDecks: toggleAllDecks
+        toggleFoil: toggleFoil
     };
 })();
 
