@@ -326,9 +326,10 @@ def get_deck_cards(deck_id):
         conn.close()
 
 
-def update_card(card_id, quantity=None, set_code=None, scryfall_id=None, image_url=None, card_name=None, is_foil=None):
+def update_card(card_id, quantity=None, set_code=None, scryfall_id=None, image_url=None, card_name=None, is_foil=None, mana_cost=None, colors=None, color_identity=None, cmc=None, type_line=None):
     conn = get_db()
     try:
+        import json
         fields = []
         values = []
         if quantity is not None:
@@ -349,6 +350,21 @@ def update_card(card_id, quantity=None, set_code=None, scryfall_id=None, image_u
         if is_foil is not None:
             fields.append("is_foil = ?")
             values.append(is_foil)
+        if mana_cost is not None:
+            fields.append("mana_cost = ?")
+            values.append(mana_cost)
+        if colors is not None:
+            fields.append("colors = ?")
+            values.append(json.dumps(colors))
+        if color_identity is not None:
+            fields.append("color_identity = ?")
+            values.append(json.dumps(color_identity))
+        if cmc is not None:
+            fields.append("cmc = ?")
+            values.append(cmc)
+        if type_line is not None:
+            fields.append("type_line = ?")
+            values.append(type_line)
         if fields:
             values.append(card_id)
             conn.execute(f"UPDATE deck_cards SET {', '.join(fields)} WHERE id = ?", values)
