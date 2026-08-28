@@ -51,6 +51,8 @@ export const api = {
 
   // Collection
   getCollection: () => request<import('./types').CollectionCard[]>('/collection'),
+  getCardDetails: (scryfallId: string) =>
+    request<import('./types').CardDetail>(`/cards/details?scryfall_id=${encodeURIComponent(scryfallId)}`),
 
   // Import
   importMoxfield: (url: string, color?: string) =>

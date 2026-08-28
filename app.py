@@ -14,7 +14,7 @@ from database import (
     get_decks_missing_commander_images, update_deck_commander_image,
     get_deck_cmc_distribution,
 )
-from scryfall import parse_card_list, validate_and_resolve_card
+from scryfall import parse_card_list, validate_and_resolve_card, lookup_card, fetch_card_detail
 from moxfield import fetch_moxfield_deck, extract_deck_id, fetch_card_images_bulk
 
 app = FastAPI(title="cEDHcube")
@@ -307,6 +307,19 @@ def api_refresh_card(card_id: int):
 @app.get("/api/collection")
 def api_collection():
     return get_collection()
+@app.get("/api/cards/details")
+def api_card_details(scryfall_id: str = "", card_name: str = ""):
+    if not scryfall_id:
+        if not card_name:
+            raise HTTPException(400, "scryfall_id or card_name required")
+        info = lookup_card(card_name)
+        if not info:
+            raise HTTPException(404, "Could not find card on Scryfall")
+        scryfall_id = info["scryfall_id"]
+    detail = fetch_card_detail(scryfall_id)
+    if not detail:
+        raise HTTPException(404, "Could not find card on Scryfall")
+    return detail
 
 # ─── Image Refresh ───
 

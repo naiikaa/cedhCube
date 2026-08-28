@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTheme, THEMES } from './hooks/useTheme';
 import { api } from './lib/api';
-import type { Deck, Card, CollectionCard, CardResult, CmcStats } from './lib/types';
+import type { Deck, Card, CollectionCard, CardResult, CmcStats, CardDetail } from './lib/types';
 import { ColorIdentity } from './components/ColorIdentity';
 import { FullManaCurve, MiniManaCurve } from './components/ManaCurve';
 import { Spinner } from './components/UI';
@@ -67,6 +67,11 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [enabledDeckIds, setEnabledDeckIds] = useState<Record<number, boolean>>({});
 
+  // ── Card detail modal ──
+  const [detailCard, setDetailCard] = useState<CollectionCard | null>(null);
+  const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
+  const [cardDetailLoading, setCardDetailLoading] = useState(false);
+
   // ── Forms ──
   const [deckName, setDeckName] = useState('');
   const [deckCards, setDeckCards] = useState('');
@@ -95,6 +100,19 @@ export default function App() {
       setEnabledDeckIds(p => { const n = { ...p }; d.forEach(dd => { if (n[dd.id] === undefined) n[dd.id] = true; }); return n; });
     }).catch(() => {});
   }, [show]);
+
+  // ── Card detail modal ──
+  const openCardDetail = async (c: CollectionCard) => {
+    setDetailCard(c);
+    setCardDetail(null);
+    setCardDetailLoading(true);
+    try {
+      setCardDetail(await api.getCardDetails(c.scryfall_id));
+    } catch (e: any) { show(e.message, 'error'); }
+    finally { setCardDetailLoading(false); }
+  };
+
+  const closeCardDetail = () => { setDetailCard(null); setCardDetail(null); };
 
   // ── Tab switch ──
   const switchTab = useCallback((t: 'decks' | 'collection') => {
@@ -165,6 +183,11 @@ export default function App() {
   const allDecksOn = decks.every(d => enabledDeckIds[d.id]);
   const toggleDeck = (id: number) => setEnabledDeckIds(p => ({ ...p, [id]: !p[id] }));
   const toggleAll = () => { const on = allDecksOn; setEnabledDeckIds(p => { const n = { ...p }; decks.forEach(d => { n[d.id] = !on; }); return n; }); };
+  // Enabled deck names, for showing only filtered decks' dots under each card.
+  const enabledDeckNames = useMemo(
+    () => new Set(decks.filter(d => enabledDeckIds[d.id]).map(d => d.name)),
+    [decks, enabledDeckIds],
+  );
 
   const filteredCollection = allCollection.filter(c => {
     const eIds = Object.keys(enabledDeckIds).filter(id => enabledDeckIds[Number(id)]);
@@ -196,7 +219,7 @@ export default function App() {
       </header>
 
       {/* ═══ TABS ═══ */}
-      <div style={{ display: 'flex', px: 6, background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)', gap: 0 }}>
+      <div style={{ display: 'flex', paddingLeft: 6, paddingRight: 6, background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)', gap: 0 }}>
         {(['decks', 'collection'] as const).map(t => (
           <button key={t} onClick={() => switchTab(t)}
             style={{ padding: '0.7rem 1.5rem', background: 'transparent', border: 'none', color: tab === t ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: tab === t ? 600 : 400, borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent', transition: 'all 0.15s' }}>
@@ -343,9 +366,10 @@ export default function App() {
             }}>
               {filteredCollection.map(c => (
                 <div key={c.scryfall_id || c.card_name}
+                  onClick={() => openCardDetail(c)}
                   style={{
                     background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                    borderRadius: 10, overflow: 'hidden', position: 'relative',
+                    borderRadius: 10, overflow: 'hidden', position: 'relative', cursor: 'pointer',
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 25px rgba(0,0,0,0.35)'; }}
@@ -395,7 +419,7 @@ export default function App() {
 
                     {/* Deck dots + color identity */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5 }}>
-                      {c.decks?.map(d => (
+                      {c.decks?.filter(d => enabledDeckNames.has(d.name)).map(d => (
                         <span key={d.name} style={{ width: 9, height: 9, borderRadius: '50%', background: d.color, border: '1px solid rgba(255,255,255,0.25)', flexShrink: 0 }} title={d.name} />
                       ))}
                       {/* Color Identity */}
@@ -523,6 +547,99 @@ export default function App() {
             <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{modalDeck.card_count} cards</span>
               <button onClick={closeModal} style={sx.btnGhost}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════ C A R D   D E T A I L   M O D A L ═══════════════════ */}
+      {detailCard && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000,
+          display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '2rem', overflowY: 'auto',
+        }} onClick={e => { if (e.target === e.currentTarget) closeCardDetail(); }}>
+          <div style={{
+            ...sx.card, maxWidth: 780, width: '92%', maxHeight: '85vh', overflowY: 'auto',
+            animation: 'fadeIn 0.2s ease-out',
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: '0.75rem' }}>
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--accent)' }}>{cardDetail?.name_en || detailCard.card_name}</h2>
+                {detailCard.type_line && <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: 2 }}>{detailCard.type_line}</div>}
+              </div>
+              <button onClick={closeCardDetail} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.3rem', padding: 0, lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+              {/* Card image */}
+              <div style={{ flexShrink: 0, width: 220, maxWidth: '100%' }}>
+                {detailCard.image_url ? (
+                  <img src={detailCard.image_url} alt={detailCard.card_name} style={{ width: '100%', height: 'auto', borderRadius: 8, border: '1px solid var(--border)' }} />
+                ) : <div style={{ width: '100%', height: 300, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>No image</div>}
+              </div>
+
+              {/* Info column */}
+              <div style={{ flex: 1, minWidth: 260 }}>
+                {cardDetailLoading ? (
+                  <div style={{ padding: '2rem 0', textAlign: 'center' }}><Spinner /></div>
+                ) : cardDetail ? (
+                  <>
+                    {/* Localized names */}
+                    <div style={{ marginBottom: 14 }}>
+                      {([['English', cardDetail.name_en], ['Deutsch', cardDetail.name_de], ['日本語', cardDetail.name_ja]] as const).map(([label, value]) => (
+                        <div key={label} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                          <span style={{ width: 76, flexShrink: 0, fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text)' }}>{value || '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Decks included */}
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Included in {detailCard.deck_count} deck{detailCard.deck_count !== 1 ? 's' : ''}</div>
+                      {detailCard.decks && detailCard.decks.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {detailCard.decks.map(d => (
+                            <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.8rem' }}>
+                              <span style={{ width: 11, height: 11, borderRadius: '50%', background: d.color, border: '1px solid rgba(255,255,255,0.25)', flexShrink: 0 }} />
+                              {d.name}
+                            </div>
+                          ))}
+                        </div>
+                      ) : <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Not currently in any deck.</div>}
+                    </div>
+
+                    {/* Oracle text */}
+                    {cardDetail.oracle_text ? (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text)', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 0.75rem', whiteSpace: 'pre-wrap' }}>
+                        {cardDetail.oracle_text}
+                      </div>
+                    ) : null}
+                  </>
+                ) : <div style={{ padding: '1.5rem 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Could not load card details.</div>}
+              </div>
+            </div>
+
+            {/* Rulings */}
+            <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+                Rulings{cardDetail && cardDetail.rulings.length > 0 ? ` (${cardDetail.rulings.length})` : ''}
+              </div>
+              {cardDetailLoading ? (
+                <div style={{ textAlign: 'center', padding: '0.5rem 0' }}><Spinner /></div>
+              ) : cardDetail && cardDetail.rulings.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {cardDetail.rulings.map((r, i) => (
+                    <div key={i} style={{ fontSize: '0.8rem', lineHeight: 1.45 }}>
+                      <div style={{ color: 'var(--text)' }}>{r.comment}</div>
+                      {r.published_at && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2 }}>{r.published_at.slice(0, 10)}</div>}
+                    </div>
+                  ))}
+                </div>
+              ) : (!cardDetailLoading && cardDetail !== null) ? (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No rulings found for this card.</div>
+              ) : null}
             </div>
           </div>
         </div>

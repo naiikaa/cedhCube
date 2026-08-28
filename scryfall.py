@@ -6,6 +6,7 @@ import re
 SCRYFALL_SEARCH = "https://api.scryfall.com/cards/named"
 SCRYFALL_CARD = "https://api.scryfall.com/cards/"
 HEADERS = {"User-Agent": "cEDHcube/1.0 (personal project)"}
+SCRYFALL_CARD_SEARCH = "https://api.scryfall.com/cards/search"
 
 
 def lookup_card(name, set_code=None):
@@ -96,3 +97,74 @@ def validate_and_resolve_card(name, set_code=None):
     # Be nice to the API - small delay
     time.sleep(0.1)
     return lookup_card(name, set_code)
+def fetch_card_detail(scryfall_id):
+    """Fetch localized names, full oracle text, and rulings for a card.
+
+    Returns dict {name_en, name_de, name_ja, oracle_text, rulings} or None.
+    """
+    try:
+        resp = requests.get(SCRYFALL_CARD + scryfall_id, headers=HEADERS, timeout=10)
+        if resp.status_code != 200:
+            return None
+        card = resp.json()
+    except Exception:
+        return None
+
+    oracle_id = card.get("oracle_id", "")
+
+    def _localized_name(locale):
+        """Localized name via oracle_id search: read printed_name (fallback name).
+
+        /cards/named does NOT accept a q= search query (it is keyed on the
+        English name), so localization must go through /cards/search with the
+        oracleid: + lang: operators.
+        """
+        if not oracle_id:
+            return ""
+        try:
+            r = requests.get(
+                SCRYFALL_CARD_SEARCH,
+                params={"q": f"oracleid:{oracle_id} lang:{locale}"},
+                headers=HEADERS,
+                timeout=10,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("data"):
+                    loc = data["data"][0]
+                    # In the default 'unique=cards' search response the `name`
+                    # field is the English oracle name; the localized label for
+                    # the target language is carried by `printed_name`, so
+                    # prefer that and fall back to `name`.
+                    return (loc.get("printed_name") or loc.get("name") or "").strip()
+        except Exception:
+            pass
+        return ""
+
+    name_en = card.get("name", "")
+    name_de = _localized_name("de") or name_en
+    name_ja = _localized_name("ja") or name_en
+
+    faces = card.get("card_faces") or []
+    if faces:
+        oracle_text = "\n\n".join(f.get("oracle_text", "").strip() for f in faces if f.get("oracle_text"))
+    else:
+        oracle_text = card.get("oracle_text", "").strip()
+
+    rulings = []
+    try:
+        r = requests.get(SCRYFALL_CARD + scryfall_id + "/rulings", headers=HEADERS, timeout=10)
+        if r.status_code == 200:
+            for rule in r.json().get("data", [])[:5]:
+                if rule.get("comment"):
+                    rulings.append({"comment": rule["comment"], "published_at": rule.get("published_at", "")})
+    except Exception:
+        pass
+
+    return {
+        "name_en": name_en,
+        "name_de": name_de,
+        "name_ja": name_ja,
+        "oracle_text": oracle_text,
+        "rulings": rulings,
+    }
