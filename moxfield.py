@@ -2,12 +2,18 @@
 import re
 import time
 import requests
+import cloudscraper
 
 from scryfall import get_image_url
 
 MOXFIELD_API = "https://api.moxfield.com/v2/decks/all/"
 MOXFIELD_URL_RE = re.compile(r"https?://(?:www\.)?moxfield\.com/decks/([a-zA-Z0-9_-]+)")
 HEADERS = {"User-Agent": "cEDHcube/1.0 (personal project)"}
+
+# Moxfield fronts its public API with a Cloudflare bot challenge that blocks
+# plain `requests`. Use a Cloudflare-aware client (browser TLS fingerprint +
+# challenge solving) so deck imports keep working.
+_moxfield_session = cloudscraper.create_scraper()
 
 
 def extract_deck_id(url):
@@ -34,7 +40,7 @@ def fetch_moxfield_deck(public_id):
     Returns None if the deck could not be fetched.
     """
     try:
-        resp = requests.get(MOXFIELD_API + public_id, headers=HEADERS, timeout=15)
+        resp = _moxfield_session.get(MOXFIELD_API + public_id, headers=HEADERS, timeout=15)
         if resp.status_code != 200:
             return None
         data = resp.json()

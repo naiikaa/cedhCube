@@ -5,6 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "flask==3.0.0",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
     "requests==2.31.0",
+    "cloudscraper",
 ]

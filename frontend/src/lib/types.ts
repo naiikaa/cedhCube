@@ -49,6 +49,19 @@ export interface CmcStats {
   avg_cmc: number;
 }
 
+export interface CardRuling {
+  comment: string;
+  published_at: string;
+}
+
+export interface CardDetail {
+  name_en: string;
+  name_de: string;
+  name_ja: string;
+  oracle_text: string;
+  rulings: CardRuling[];
+}
+
 export interface CardResult {
   status: 'ok' | 'not_found';
   requested: string;
