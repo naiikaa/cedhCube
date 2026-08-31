@@ -33,7 +33,7 @@ const OUT = '/home/npopkov/magic-collection/docs/screenshots';
   await page.click('button:has-text("Decks")');
   await page.waitForTimeout(500);
   const searchInput = page.locator('input[placeholder="Search collection…"]');
-  await searchInput.fill('Jeska');
+  await searchInput.fill('Brain Freeze');
   await searchInput.press('Enter');
   await page.waitForTimeout(1200);
   await shot('04-global-search');
