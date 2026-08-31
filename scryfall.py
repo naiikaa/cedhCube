@@ -29,6 +29,7 @@ def lookup_card(name, set_code=None):
                 "colors": data.get("colors", []),
                 "color_identity": data.get("color_identity", []),
                 "cmc": data.get("converted_mana_cost", 0),
+                "oracle_text": get_oracle_text(data),
             }
         elif resp.status_code == 404:
             return None
@@ -48,6 +49,14 @@ def get_image_url(data):
     if "image_uris" in data:
         return data["image_uris"].get("normal", data["image_uris"].get("small", ""))
     return ""
+
+
+def get_oracle_text(data):
+    """Concatenate the oracle text of a Scryfall card object across all faces."""
+    faces = data.get("card_faces")
+    if faces:
+        return "\n".join(f.get("oracle_text", "") for f in faces if f.get("oracle_text"))
+    return data.get("oracle_text", "") or ""
 
 
 def parse_card_list(text):
