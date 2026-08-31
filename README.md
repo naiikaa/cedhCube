@@ -42,7 +42,7 @@ Seven built-in color themes (Default, Gruvbox, Dracula, Nord, One Dark, Monokai,
 
 ![Theme switcher open](docs/screenshots/05-theme-switcher.jpg)
 
-![Dracula theme applied](docs/screenshots/06-theme-dracula.jpg)
+![Asimov theme applied](docs/screenshots/06-theme-asimov.jpg)
 
 ---
 
