@@ -4,6 +4,8 @@ export interface Deck {
   color: string;
   commander_name: string;
   commander_image_url: string;
+  commander2_name: string;
+  commander2_image_url: string;
   card_count: number;
   total_cards: number;
   color_identity: string;

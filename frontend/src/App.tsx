@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
 import {
-  CircleCheck, CircleX, Crown, ImageOff, Layers, LibraryBig, Pencil, RefreshCw, Trash2, X,
+  Check, CircleCheck, CircleX, Crown, ImageOff, Layers, LibraryBig, Pencil, RefreshCw, Trash2, X,
 } from 'lucide-react';
 import { api } from './lib/api';
 import type { Deck, Card, CollectionCard, CardResult, CmcStats, CardDetail } from './lib/types';
@@ -32,6 +32,19 @@ const DEFAULT_DECK_COLOR = '#e94560';
 
 /** Single place that turns a rejected API promise into toast copy. */
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** One commander slot, in list order (slot 1 first). */
+type CommanderPick = { name: string; image: string };
+
+/**
+ * A deck's commanders as a 0–2 entry list, so every surface can iterate instead
+ * of branching on the two column pairs. Partner decks fill both slots.
+ */
+const deckCommanders = (deck: Deck): CommanderPick[] =>
+  [
+    { name: deck.commander_name, image: deck.commander_image_url },
+    { name: deck.commander2_name, image: deck.commander2_image_url },
+  ].filter(c => !!c.name);
 
 // ─── App ───
 export default function App() {
@@ -188,9 +201,36 @@ export default function App() {
     try { const r = await api.addCards(modalDeck.id, addCardsText.trim()); setAddCardsResults(r.results); setAddCardsText(''); loadModal(modalDeck.id); } catch (e) { show(errText(e), 'error'); } finally { setAddCardsLoading(false); }
   };
 
-  const setCommander = async (name: string, img: string) => {
+  /** Writes the full commander selection (0, 1 or 2 slots) and mirrors it locally. */
+  const setCommanders = async (picks: CommanderPick[]) => {
     if (!modalDeck) return;
-    try { await api.updateDeckCommander(modalDeck.id, name, img); setModalDeck({ ...modalDeck, commander_name: name, commander_image_url: img }); setShowCommanderPicker(false); loadDecks(); } catch {}
+    const [first, second] = picks;
+    try {
+      await api.updateDeckCommander(
+        modalDeck.id,
+        first?.name ?? '', first?.image ?? '',
+        second?.name ?? '', second?.image ?? '',
+      );
+      setModalDeck({
+        ...modalDeck,
+        commander_name: first?.name ?? '', commander_image_url: first?.image ?? '',
+        commander2_name: second?.name ?? '', commander2_image_url: second?.image ?? '',
+      });
+      loadDecks();
+    } catch (e) { show(errText(e), 'error'); }
+  };
+
+  /**
+   * Toggle a legendary creature in/out of the commander slots. Picking a third
+   * pushes out the oldest selection, so a click always does something visible.
+   */
+  const toggleCommander = (card: Card) => {
+    if (!modalDeck) return;
+    const current = deckCommanders(modalDeck);
+    const idx = current.findIndex(c => c.name === card.card_name);
+    if (idx >= 0) return setCommanders(current.filter((_, i) => i !== idx));
+    const pick = { name: card.card_name, image: card.image_url || '' };
+    return setCommanders([...current.slice(current.length < 2 ? 0 : 1), pick]);
   };
 
   // ── Collection filters ──
@@ -212,9 +252,14 @@ export default function App() {
     return true;
   });
 
-  const legendaryCreatures = modalCards.filter(c => {
-    const tl = (c.type_line || '').toLowerCase(); return tl.includes('legendary') && tl.includes('creature');
+  // Cards eligible for a commander slot: legendary creatures, plus Backgrounds
+  // (legendary enchantments) for "Choose a Background" pairs.
+  const commanderCandidates = modalCards.filter(c => {
+    const tl = (c.type_line || '').toLowerCase();
+    return (tl.includes('legendary') && tl.includes('creature')) || tl.includes('background');
   });
+
+  const modalCommanders = modalDeck ? deckCommanders(modalDeck) : [];
 
   const totalCards = useMemo(
     () => allCollection.reduce((sum, c) => sum + (c.total_quantity || 0), 0),
@@ -309,13 +354,23 @@ export default function App() {
             </div>
           ) : (
             <div className="deck-list">
-              {decks.map(deck => (
+              {decks.map(deck => {
+                const cmds = deckCommanders(deck);
+                return (
                 <button key={deck.id} type="button"
                   className="frame frame-hover deck-row"
                   style={{ '--deck-color': deck.color } as CSSProperties}
                   onClick={() => openDeck(deck)}
                 >
-                  {deck.commander_image_url ? (
+                  {cmds.length > 1 ? (
+                    <span className="cmd-art-pair">
+                      {cmds.map(c => (c.image ? (
+                        <img key={c.name} className="cmd-art pair" src={c.image} alt="" loading="lazy" />
+                      ) : (
+                        <span key={c.name} className="cmd-placeholder pair"><Crown aria-hidden="true" /></span>
+                      )))}
+                    </span>
+                  ) : deck.commander_image_url ? (
                     <img className="cmd-art" src={deck.commander_image_url} alt="" loading="lazy" />
                   ) : (
                     <span className="cmd-placeholder"><Crown aria-hidden="true" /></span>
@@ -326,10 +381,10 @@ export default function App() {
                       <span className="deck-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deck.name}</span>
                       <ColorIdentity identity={deck.color_identity} size="sm" />
                     </span>
-                    {deck.commander_name && (
+                    {cmds.length > 0 && (
                       <span className="deck-commander">
                         <Crown aria-hidden="true" />
-                        <span>{deck.commander_name}</span>
+                        <span>{cmds.map(c => c.name).join(' // ')}</span>
                       </span>
                     )}
                     <MiniManaCurve stats={deckStats[deck.id] || null} />
@@ -340,7 +395,8 @@ export default function App() {
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{deck.total_cards} total</span>
                   </span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -461,44 +517,54 @@ export default function App() {
             {/* Mana curve */}
             <FullManaCurve stats={modalStats} />
 
-            {/* Commander */}
+            {/* Commanders */}
             <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {modalDeck.commander_image_url
-                  ? <img className="cmd-art sm" src={modalDeck.commander_image_url} alt="" />
+                {modalCommanders.length > 0
+                  ? modalCommanders.map(c => (c.image
+                    ? <img key={c.name} className="cmd-art sm" src={c.image} alt="" />
+                    : <span key={c.name} className="cmd-placeholder sm"><Crown aria-hidden="true" /></span>))
                   : <span className="cmd-placeholder"><Crown aria-hidden="true" /></span>}
                 <div style={{ minWidth: 0 }}>
-                  <div className="meta-label">Commander</div>
-                  {modalDeck.commander_name ? (
-                    <div className="display" style={{ fontSize: '0.9rem', color: 'var(--commander)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Crown size={13} aria-hidden="true" />
-                      {modalDeck.commander_name}
-                    </div>
+                  <div className="meta-label">{modalCommanders.length > 1 ? 'Commanders' : 'Commander'}</div>
+                  {modalCommanders.length > 0 ? (
+                    modalCommanders.map(c => (
+                      <div key={c.name} className="display" style={{ fontSize: '0.9rem', color: 'var(--commander)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Crown size={13} aria-hidden="true" />
+                        {c.name}
+                      </div>
+                    ))
                   ) : (
                     <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem' }}>Not set</div>
                   )}
                 </div>
-                {legendaryCreatures.length > 0 && (
+                {commanderCandidates.length > 0 && (
                   <button type="button" className="btn-ghost" style={{ marginLeft: 'auto' }}
                     onClick={() => setShowCommanderPicker(!showCommanderPicker)}>
-                    {showCommanderPicker ? 'Cancel' : 'Change'}
+                    {showCommanderPicker ? 'Done' : 'Change'}
                   </button>
                 )}
               </div>
-              {showCommanderPicker && legendaryCreatures.length > 0 && (
+              {showCommanderPicker && commanderCandidates.length > 0 && (
                 <div className="slide-down" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {legendaryCreatures.map(c => (
-                    <button key={c.id} type="button" className="picker-option" role="radio"
-                      aria-checked={c.card_name === modalDeck.commander_name}
-                      onClick={() => setCommander(c.card_name, c.image_url || '')}>
-                      <CardImage url={c.image_url} name={c.card_name} size={24} />
-                      {c.card_name}
-                    </button>
-                  ))}
+                  <div className="meta-label" style={{ marginBottom: 2 }}>
+                    Pick up to two (partner, background, friends forever) — a third replaces the first
+                  </div>
+                  {commanderCandidates.map(c => {
+                    const picked = modalCommanders.some(m => m.name === c.card_name);
+                    return (
+                      <button key={c.id} type="button" className="picker-option" role="checkbox"
+                        aria-checked={picked} onClick={() => toggleCommander(c)}>
+                        <CardImage url={c.image_url} name={c.card_name} size={24} />
+                        {c.card_name}
+                        {picked && <Check size={14} aria-hidden="true" style={{ marginLeft: 'auto', flexShrink: 0 }} />}
+                      </button>
+                    );
+                  })}
                   <button type="button" className="picker-option" style={{ color: 'var(--text-muted)' }}
-                    onClick={() => setCommander('', '')}>
+                    onClick={() => setCommanders([])}>
                     <X size={14} aria-hidden="true" />
-                    Clear commander
+                    {modalCommanders.length > 1 ? 'Clear commanders' : 'Clear commander'}
                   </button>
                 </div>
               )}
