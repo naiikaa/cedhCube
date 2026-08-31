@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-type Theme = 'default' | 'gruvbox' | 'dracula' | 'nord' | 'onedark' | 'monokai' | 'asimov';
+export type Theme = 'default' | 'gruvbox' | 'dracula' | 'nord' | 'onedark' | 'monokai' | 'asimov';
 
 interface ThemeContextType {
   theme: Theme;
@@ -36,14 +36,15 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
 export const useTheme = () => useContext(ThemeContext);
 
-export const THEMES: { value: Theme; label: string }[] = [
-  { value: 'default', label: 'Default' },
-  { value: 'gruvbox', label: 'Gruvbox' },
-  { value: 'dracula', label: 'Dracula' },
-  { value: 'nord', label: 'Nord' },
-  { value: 'onedark', label: 'One Dark' },
-  { value: 'monokai', label: 'Monokai' },
-  { value: 'asimov', label: 'Asimov' },
+/** `swatch` mirrors each theme's [surface, accent, commander] vars for the picker preview. */
+export const THEMES: { value: Theme; label: string; swatch: [string, string, string] }[] = [
+  { value: 'default', label: 'Default', swatch: ['#16162a', '#e94560', '#ffe66d'] },
+  { value: 'gruvbox', label: 'Gruvbox', swatch: ['#242422', '#fb4934', '#fabd2f'] },
+  { value: 'dracula', label: 'Dracula', swatch: ['#262738', '#ff79c6', '#f1fa8c'] },
+  { value: 'nord', label: 'Nord', swatch: ['#2d3342', '#88c0d0', '#ebcb8b'] },
+  { value: 'onedark', label: 'One Dark', swatch: ['#2a2d36', '#e06c75', '#e5c07b'] },
+  { value: 'monokai', label: 'Monokai', swatch: ['#262722', '#f92672', '#e6db74'] },
+  { value: 'asimov', label: 'Asimov', swatch: ['#101010', '#ff8c00', '#ff8c00'] },
 ];
 
 export const DECK_COLOR_PRESETS = [
