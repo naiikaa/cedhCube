@@ -24,10 +24,21 @@ export const api = {
   deleteDeck: (id: number) => request<{ ok: boolean }>(`/decks/${id}`, { method: 'DELETE' }),
   updateDeckColor: (id: number, color: string) =>
     request<{ ok: boolean }>(`/decks/${id}/color`, { method: 'PUT', body: JSON.stringify({ color }) }),
-  updateDeckCommander: (id: number, commanderName: string, commanderImageUrl: string) =>
+  updateDeckCommander: (
+    id: number,
+    commanderName: string,
+    commanderImageUrl: string,
+    commander2Name = '',
+    commander2ImageUrl = '',
+  ) =>
     request<{ ok: boolean }>(`/decks/${id}/commander`, {
       method: 'PUT',
-      body: JSON.stringify({ commander_name: commanderName, commander_image_url: commanderImageUrl }),
+      body: JSON.stringify({
+        commander_name: commanderName,
+        commander_image_url: commanderImageUrl,
+        commander2_name: commander2Name,
+        commander2_image_url: commander2ImageUrl,
+      }),
     }),
   getDeckStats: (id: number) => request<import('./types').CmcStats>(`/decks/${id}/stats`),
   getDeckColorIdentity: (id: number) =>

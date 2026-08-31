@@ -605,6 +605,13 @@ textarea.field.mono { font-family: var(--font-mono); font-size: 0.8rem; line-hei
   box-shadow: 0 0 0 1px var(--commander), 0 0 0 4px color-mix(in srgb, var(--commander) 16%, transparent);
 }
 .cmd-art.sm { width: 38px; height: 38px; }
+/* two commanders (partner): narrower crops side by side, same ring treatment */
+.cmd-art-pair {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.cmd-art.pair, .cmd-placeholder.pair { width: 30px; }
 .cmd-placeholder {
   width: 46px;
   height: 46px;
@@ -617,6 +624,8 @@ textarea.field.mono { font-family: var(--font-mono); font-size: 0.8rem; line-hei
   flex-shrink: 0;
 }
 .cmd-placeholder svg { width: 17px; height: 17px; }
+.cmd-placeholder.sm { width: 38px; height: 38px; }
+.cmd-placeholder.sm svg { width: 14px; height: 14px; }
 
 /* ═══ Collection grid ═══ */
 .card-grid {
