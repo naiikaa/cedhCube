@@ -41,6 +41,8 @@ def init_db():
             color TEXT DEFAULT '#e94560',
             commander_name TEXT DEFAULT '',
             commander_image_url TEXT DEFAULT '',
+            commander2_name TEXT DEFAULT '',
+            commander2_image_url TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -71,6 +73,10 @@ def init_db():
         conn.execute("ALTER TABLE decks ADD COLUMN commander_name TEXT DEFAULT ''")
     if 'commander_image_url' not in cols:
         conn.execute("ALTER TABLE decks ADD COLUMN commander_image_url TEXT DEFAULT ''")
+    if 'commander2_name' not in cols:
+        conn.execute("ALTER TABLE decks ADD COLUMN commander2_name TEXT DEFAULT ''")
+    if 'commander2_image_url' not in cols:
+        conn.execute("ALTER TABLE decks ADD COLUMN commander2_image_url TEXT DEFAULT ''")
     card_cols = [row[1] for row in conn.execute("PRAGMA table_info(deck_cards)").fetchall()]
     if 'is_foil' not in card_cols:
         conn.execute("ALTER TABLE deck_cards ADD COLUMN is_foil INTEGER DEFAULT 0")
@@ -157,12 +163,16 @@ def update_deck_color(deck_id, color):
         conn.close()
 
 
-def update_deck_commander(deck_id, commander_name, commander_image_url):
+def update_deck_commander(deck_id, commander_name, commander_image_url,
+                          commander2_name='', commander2_image_url=''):
     conn = get_db()
     try:
         conn.execute(
-            "UPDATE decks SET commander_name = ?, commander_image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (commander_name or "", commander_image_url or "", deck_id)
+            "UPDATE decks SET commander_name = ?, commander_image_url = ?, "
+            "commander2_name = ?, commander2_image_url = ?, "
+            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (commander_name or "", commander_image_url or "",
+             commander2_name or "", commander2_image_url or "", deck_id)
         )
         conn.commit()
     finally:
@@ -210,32 +220,45 @@ def update_card_image(card_id, image_url):
 
 
 def get_decks_missing_commander_images():
-    """Get decks that have a commander_name but no commander_image_url.
-    Tries to find the commander card in deck_cards to get its scryfall_id.
-    Returns list of dicts: deck_id, commander_name, scryfall_id
+    """Get decks that have a commander name but no matching commander image.
+
+    Covers both commander slots. Tries to find the commander card in deck_cards
+    to get its scryfall_id.
+    Returns list of dicts: deck_id, commander_name, scryfall_id, slot
+    """
+    query = """
+        SELECT d.id as deck_id, d.{name_col} as commander_name, dc.scryfall_id
+        FROM decks d
+        JOIN deck_cards dc ON dc.deck_id = d.id AND dc.card_name = d.{name_col}
+        WHERE d.{name_col} IS NOT NULL AND d.{name_col} != ''
+          AND (d.{image_col} IS NULL OR d.{image_col} = '')
+          AND dc.scryfall_id IS NOT NULL AND dc.scryfall_id != ''
+        GROUP BY d.id
     """
     conn = get_db()
     try:
-        rows = conn.execute("""
-            SELECT d.id as deck_id, d.commander_name, dc.scryfall_id
-            FROM decks d
-            JOIN deck_cards dc ON dc.deck_id = d.id AND dc.card_name = d.commander_name
-            WHERE d.commander_name IS NOT NULL AND d.commander_name != ''
-              AND (d.commander_image_url IS NULL OR d.commander_image_url = '')
-              AND dc.scryfall_id IS NOT NULL AND dc.scryfall_id != ''
-            GROUP BY d.id
-        """).fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        for slot, (name_col, image_col) in enumerate(
+            (("commander_name", "commander_image_url"),
+             ("commander2_name", "commander2_image_url")), start=1
+        ):
+            rows = conn.execute(query.format(name_col=name_col, image_col=image_col)).fetchall()
+            for r in rows:
+                entry = dict(r)
+                entry["slot"] = slot
+                result.append(entry)
+        return result
     finally:
         conn.close()
 
 
-def update_deck_commander_image(deck_id, image_url):
-    """Update the commander_image_url for a deck."""
+def update_deck_commander_image(deck_id, image_url, slot=1):
+    """Update the image URL for a deck's commander in `slot` (1 or 2)."""
+    column = "commander2_image_url" if slot == 2 else "commander_image_url"
     conn = get_db()
     try:
         conn.execute(
-            "UPDATE decks SET commander_image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            f"UPDATE decks SET {column} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (image_url, deck_id)
         )
         conn.commit()
