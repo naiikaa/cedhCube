@@ -1,27 +1,23 @@
-const SYMBOLS: Record<string, string> = {
-  W: '☀️',  // White → sun
-  U: '💧',  // Blue → waterdrop
-  B: '💀',  // Black → skull
-  R: '🔥',  // Red → fire
-  G: '🌲',  // Green → tree
-  C: '⚪',  // Colorless → white sphere
-};
+import { parseColorIdentity } from '../lib/mana';
+import { ManaPip } from './ManaPip';
 
-export function ColorIdentity({ identity }: { identity: string }) {
-  let colors: string[];
-  try {
-    colors = JSON.parse(identity);
-  } catch {
-    colors = [];
-  }
-  if (!Array.isArray(colors) || colors.length === 0) {
-    return <span className="color-pip color-pip\:C" title="Colorless">{SYMBOLS.C}</span>;
-  }
+export interface ColorIdentityProps {
+  /** JSON-encoded array from the API (`'["W","U"]'`) or an already-parsed array. */
+  identity: string | string[] | null | undefined;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+/**
+ * The single source of truth for colour-identity pips. Empty identity renders
+ * the colorless pip, matching how Scryfall/EDHREC present colourless commanders.
+ */
+export function ColorIdentity({ identity, size = 'md' }: ColorIdentityProps) {
+  const colors = parseColorIdentity(identity);
   return (
-    <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
-      {colors.map(c => (
-        <span key={c} className={`color-pip color-pip\\:${c}`} title={c}>{SYMBOLS[c] || c}</span>
-      ))}
+    <span className={`pips ${size === 'md' ? '' : size}`}>
+      {colors.length === 0
+        ? <ManaPip symbol="C" />
+        : colors.map(c => <ManaPip key={c} symbol={c} />)}
     </span>
   );
 }
