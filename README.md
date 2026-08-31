@@ -38,11 +38,11 @@ The search box in the header works from anywhere in the app: typing a card name 
 
 ## Theming
 
-Seven built-in color themes (Default, Gruvbox, Dracula, Nord, One Dark, Monokai, Asimov), switchable from the header without a page reload. Preference is remembered in `localStorage`. Mana symbols always keep their canonical WUBRG colors regardless of theme — matching every real MTG product.
+Nine built-in color themes — Default, Gruvbox, Dracula, Nord, One Dark, Monokai, and Asimov match their editor namesakes' authentic palettes, plus two soft light themes, **Blossom** (pink) and **Lilac** (lavender). Switchable from the header without a page reload; preference is remembered in `localStorage`. Mana symbols always keep their canonical WUBRG colors regardless of theme — matching every real MTG product.
 
 ![Theme switcher open](docs/screenshots/05-theme-switcher.jpg)
 
-![Asimov theme applied](docs/screenshots/06-theme-asimov.jpg)
+![Lilac theme applied](docs/screenshots/06-theme-lilac.jpg)
 
 ---
 

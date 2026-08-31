@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-export type Theme = 'default' | 'gruvbox' | 'dracula' | 'nord' | 'onedark' | 'monokai' | 'asimov';
+export type Theme = 'default' | 'gruvbox' | 'dracula' | 'nord' | 'onedark' | 'monokai' | 'asimov' | 'blossom' | 'lilac';
 
 interface ThemeContextType {
   theme: Theme;
@@ -39,12 +39,14 @@ export const useTheme = () => useContext(ThemeContext);
 /** `swatch` mirrors each theme's [surface, accent, commander] vars for the picker preview. */
 export const THEMES: { value: Theme; label: string; swatch: [string, string, string] }[] = [
   { value: 'default', label: 'Default', swatch: ['#16162a', '#e94560', '#ffe66d'] },
-  { value: 'gruvbox', label: 'Gruvbox', swatch: ['#242422', '#fb4934', '#fabd2f'] },
-  { value: 'dracula', label: 'Dracula', swatch: ['#262738', '#ff79c6', '#f1fa8c'] },
-  { value: 'nord', label: 'Nord', swatch: ['#2d3342', '#88c0d0', '#ebcb8b'] },
-  { value: 'onedark', label: 'One Dark', swatch: ['#2a2d36', '#e06c75', '#e5c07b'] },
-  { value: 'monokai', label: 'Monokai', swatch: ['#262722', '#f92672', '#e6db74'] },
+  { value: 'gruvbox', label: 'Gruvbox', swatch: ['#32302f', '#fb4934', '#fabd2f'] },
+  { value: 'dracula', label: 'Dracula', swatch: ['#343746', '#ff79c6', '#f1fa8c'] },
+  { value: 'nord', label: 'Nord', swatch: ['#3b4252', '#88c0d0', '#ebcb8b'] },
+  { value: 'onedark', label: 'One Dark', swatch: ['#21252b', '#61afef', '#e5c07b'] },
+  { value: 'monokai', label: 'Monokai', swatch: ['#2d2e27', '#f92672', '#e6db74'] },
   { value: 'asimov', label: 'Asimov', swatch: ['#101010', '#ff8c00', '#ff8c00'] },
+  { value: 'blossom', label: 'Blossom', swatch: ['#ffe9f0', '#e8558f', '#c9184a'] },
+  { value: 'lilac', label: 'Lilac', swatch: ['#efe7fb', '#9b6bcf', '#8447c9'] },
 ];
 
 export const DECK_COLOR_PRESETS = [

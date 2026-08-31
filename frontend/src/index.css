@@ -41,56 +41,62 @@
   --glow-accent: 0 0 20px rgba(233, 69, 96, 0.15);
 }
 
+/* Gruvbox — official "medium" dark palette (bg0 #282828, not near-black). */
 [data-theme="gruvbox"] {
-  --bg: #1a1a1a; --bg-surface: #242422; --bg-surface-hover: #2c2c2a; --bg-elevated: #2a2a28;
-  --border: #3c3c38; --border-light: #4c4c48;
-  --text: #ebdbb2; --text-dim: #a89984; --text-muted: #7c7c6e;
-  --accent: #fb4934; --accent-hover: #cc241d; --accent-glow: rgba(251, 73, 52, 0.3); --accent-alt: #458588;
+  --bg: #282828; --bg-surface: #32302f; --bg-surface-hover: #3c3836; --bg-elevated: #3c3836;
+  --border: #504945; --border-light: #665c54;
+  --text: #ebdbb2; --text-dim: #d5c4a1; --text-muted: #a89984;
+  --accent: #fb4934; --accent-hover: #cc241d; --accent-glow: rgba(251, 73, 52, 0.3); --accent-alt: #83a598;
   --danger: #9d0006; --danger-hover: #cc241d;
-  --success-bg: #1a2e1a; --error-bg: #3a1a1a;
+  --success-bg: #32361f; --error-bg: #3d211a;
   --success: #b8bb26; --error: #fb4934;
-  --commander: #fabd2f; --commander-bg: #3a3520; --input-bg: #242422;
+  --commander: #fabd2f; --commander-bg: #3a3520; --input-bg: #3c3836;
 }
+/* Dracula — official palette (background #282a36, current-line #44475a). */
 [data-theme="dracula"] {
-  --bg: #1e1f2a; --bg-surface: #262738; --bg-surface-hover: #2e2f44; --bg-elevated: #2c2d40;
-  --border: #3a3b50; --border-light: #4a4b60;
-  --text: #f8f8f2; --text-dim: #b0b0c8; --text-muted: #6c6d88;
-  --accent: #ff79c6; --accent-hover: #ff55c0; --accent-glow: rgba(255, 121, 198, 0.3); --accent-alt: #6272a4; --accent-fg: #1e1f2a;
+  --bg: #282a36; --bg-surface: #343746; --bg-surface-hover: #3d4052; --bg-elevated: #383a4c;
+  --border: #44475a; --border-light: #565971;
+  --text: #f8f8f2; --text-dim: #c4c6d0; --text-muted: #6272a4;
+  --accent: #ff79c6; --accent-hover: #ff92d0; --accent-glow: rgba(255, 121, 198, 0.3); --accent-alt: #bd93f9; --accent-fg: #282a36;
   --danger: #ff5555; --danger-hover: #ff3333;
-  --success-bg: #2a3a2a; --error-bg: #3a2a2a;
+  --success-bg: #2c3a2e; --error-bg: #3a2a2a;
   --success: #50fa7b; --error: #ff5555;
-  --commander: #f1fa8c; --commander-bg: #3a3a28; --input-bg: #262738;
+  --commander: #f1fa8c; --commander-bg: #3a3a28; --input-bg: #343746;
 }
+/* Nord — official palette (nord0/1/2 polar night, nord8 frost accent). */
 [data-theme="nord"] {
-  --bg: #232832; --bg-surface: #2d3342; --bg-surface-hover: #353c4e; --bg-elevated: #333a4a;
-  --border: #3c4456; --border-light: #4a5266;
-  --text: #eceff4; --text-dim: #c0c8da; --text-muted: #727c94;
-  --accent: #88c0d0; --accent-hover: #7ab0c0; --accent-glow: rgba(136, 192, 208, 0.3); --accent-alt: #5e81ac; --accent-fg: #232832;
+  --bg: #2e3440; --bg-surface: #3b4252; --bg-surface-hover: #434c5e; --bg-elevated: #3b4252;
+  --border: #434c5e; --border-light: #4c566a;
+  --text: #eceff4; --text-dim: #d8dee9; --text-muted: #7e8a9e;
+  --accent: #88c0d0; --accent-hover: #8fbcbb; --accent-glow: rgba(136, 192, 208, 0.3); --accent-alt: #81a1c1; --accent-fg: #2e3440;
   --danger: #bf616a; --danger-hover: #a9444e;
-  --success-bg: #2a3a30; --error-bg: #3a2a30;
+  --success-bg: #2c3a35; --error-bg: #3a2c30;
   --success: #a3be8c; --error: #bf616a;
-  --commander: #ebcb8b; --commander-bg: #3a3520; --input-bg: #2d3342;
+  --commander: #ebcb8b; --commander-bg: #3a3520; --input-bg: #3b4252;
 }
+/* One Dark (Atom) — official palette (bg #282c34, gutter #21252b). */
 [data-theme="onedark"] {
-  --bg: #21242c; --bg-surface: #2a2d36; --bg-surface-hover: #323540; --bg-elevated: #30333e;
-  --border: #3a3d48; --border-light: #4a4d58;
-  --text: #abb2bf; --text-dim: #8a909e; --text-muted: #5c5f6e;
-  --accent: #e06c75; --accent-hover: #d05a65; --accent-glow: rgba(224, 108, 117, 0.3); --accent-alt: #56b6c2;
+  --bg: #282c34; --bg-surface: #21252b; --bg-surface-hover: #2c313a; --bg-elevated: #2c313c;
+  --border: #3a3f4b; --border-light: #4b5263;
+  --text: #abb2bf; --text-dim: #9da5b4; --text-muted: #5c6370;
+  --accent: #61afef; --accent-hover: #74bbf0; --accent-glow: rgba(97, 175, 239, 0.3); --accent-alt: #c678dd; --accent-fg: #282c34;
   --danger: #e06c75; --danger-hover: #be5046;
   --success-bg: #2a3a2a; --error-bg: #3a2a2a;
   --success: #98c379; --error: #e06c75;
-  --commander: #e5c07b; --commander-bg: #3a3520; --input-bg: #2a2d36;
+  --commander: #e5c07b; --commander-bg: #3a3520; --input-bg: #21252b;
 }
+/* Monokai — official palette (bg #272822). */
 [data-theme="monokai"] {
-  --bg: #1e1f1a; --bg-surface: #262722; --bg-surface-hover: #2e2f2a; --bg-elevated: #2c2d28;
-  --border: #3a3b34; --border-light: #4a4b44;
-  --text: #f8f8f2; --text-dim: #aaa898; --text-muted: #6c6a5e;
-  --accent: #f92672; --accent-hover: #e01060; --accent-glow: rgba(249, 38, 114, 0.3); --accent-alt: #66d9ef;
+  --bg: #272822; --bg-surface: #2d2e27; --bg-surface-hover: #35362e; --bg-elevated: #32332b;
+  --border: #414339; --border-light: #54564a;
+  --text: #f8f8f2; --text-dim: #cfcfc2; --text-muted: #75715e;
+  --accent: #f92672; --accent-hover: #ff4f8f; --accent-glow: rgba(249, 38, 114, 0.3); --accent-alt: #66d9ef;
   --danger: #f92672; --danger-hover: #e01060;
-  --success-bg: #2a3a2a; --error-bg: #3a2a2a;
+  --success-bg: #2c3a22; --error-bg: #3a2a2a;
   --success: #a6e22e; --error: #f92672;
-  --commander: #e6db74; --commander-bg: #3a3820; --input-bg: #262722;
+  --commander: #e6db74; --commander-bg: #3a3820; --input-bg: #2d2e27;
 }
+/* Asimov — custom high-contrast near-black + amber terminal theme. */
 [data-theme="asimov"] {
   --bg: #070707; --bg-surface: #101010; --bg-surface-hover: #181818; --bg-elevated: #161616;
   --border: #222; --border-light: #333;
@@ -100,6 +106,30 @@
   --success-bg: #1a2e1a; --error-bg: #3a1a1a;
   --success: #8fbf4f; --error: #cc3300;
   --commander: #ff8c00; --commander-bg: #2a1f00; --input-bg: #101010;
+}
+/* Blossom — soft light pink theme. */
+[data-theme="blossom"] {
+  --bg: #fff5f8; --bg-surface: #ffe9f0; --bg-surface-hover: #ffdfe9; --bg-elevated: #fff0f5;
+  --border: #f6c9db; --border-light: #f0aec8;
+  --text: #4a2233; --text-dim: #8a5570; --text-muted: #b98aa0;
+  --accent: #e8558f; --accent-hover: #d43f78; --accent-glow: rgba(232, 85, 143, 0.22); --accent-alt: #c77dc9; --accent-fg: #fff;
+  --danger: #d63447; --danger-hover: #b82a3a;
+  --success-bg: #e3f5e6; --error-bg: #fde3e6;
+  --success: #3a9a5c; --error: #d63447;
+  --commander: #c9184a; --commander-bg: #ffe0ea; --input-bg: #ffffff;
+  --frame-inner: rgba(74, 34, 51, 0.045);
+}
+/* Lilac — soft light lavender theme. */
+[data-theme="lilac"] {
+  --bg: #f8f5fc; --bg-surface: #efe7fb; --bg-surface-hover: #e6daf9; --bg-elevated: #f3edfc;
+  --border: #ddccf5; --border-light: #c6adee;
+  --text: #392a52; --text-dim: #75629c; --text-muted: #a698c4;
+  --accent: #9b6bcf; --accent-hover: #8353c0; --accent-glow: rgba(155, 107, 207, 0.22); --accent-alt: #cf7dc0; --accent-fg: #fff;
+  --danger: #d1435c; --danger-hover: #b3324a;
+  --success-bg: #e2f5e6; --error-bg: #fbe4ea;
+  --success: #3f9a5f; --error: #d1435c;
+  --commander: #8447c9; --commander-bg: #ede1fb; --input-bg: #ffffff;
+  --frame-inner: rgba(57, 42, 82, 0.045);
 }
 
 /* ── Typography & frame tokens ── */
