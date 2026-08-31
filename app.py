@@ -1,4 +1,5 @@
 """FastAPI backend for cEDHcube."""
+import re
 import threading
 import json
 from fastapi import FastAPI, HTTPException
@@ -42,6 +43,8 @@ class UpdateColorRequest(BaseModel):
 class UpdateCommanderRequest(BaseModel):
     commander_name: str = ""
     commander_image_url: str = ""
+    commander2_name: str = ""
+    commander2_image_url: str = ""
 
 class AddCardsRequest(BaseModel):
     card_list: str
@@ -63,6 +66,79 @@ class ImportDeckRequest(BaseModel):
     url: str
     color: Optional[str] = None
 
+# ─── Commander Detection ───
+
+# "Partner with <Name>" is followed by reminder text in parentheses, so the name
+# runs to the first '(' or end of line. Card names may contain commas.
+_PARTNER_WITH_RE = re.compile(r"partner with ([^\n(]+)", re.I)
+
+# Mechanics that allow a second commander.
+_PARTNER_MECHANICS = (
+    "partner", "choose a background", "friends forever", "doctor's companion",
+    "background",  # Backgrounds themselves are "Legendary Enchantment — Background"
+)
+
+
+def _card_text(card):
+    return f"{card.get('type_line') or ''}\n{card.get('oracle_text') or ''}".lower()
+
+
+def _is_legendary_creature(card):
+    tl = (card.get("type_line") or "").lower()
+    return "legendary" in tl and "creature" in tl
+
+
+def _is_background(card):
+    return "background" in (card.get("type_line") or "").lower()
+
+
+def _has_partner_mechanic(card):
+    text = _card_text(card)
+    return any(k in text for k in _PARTNER_MECHANICS)
+
+
+def _name_matches(card, wanted):
+    """Match a Scryfall card against a name, tolerating '//' double-faced names."""
+    name = (card.get("name") or "").lower()
+    wanted = wanted.lower()
+    return name == wanted or name.startswith(wanted + " //")
+
+
+def detect_commanders(cards):
+    """Pick up to two commanders from resolved Scryfall card dicts.
+
+    Returns (commander, commander2) where each is a resolved card dict or None.
+    Order follows the card list, so slot 1 stays what it was before partner
+    support for single-commander decks.
+    """
+    legends = [c for c in cards if _is_legendary_creature(c)]
+    if not legends:
+        return None, None
+
+    # 1. Explicit "Partner with X" — pair only when both halves are present.
+    for card in legends:
+        for match in _PARTNER_WITH_RE.finditer(card.get("oracle_text") or ""):
+            wanted = match.group(1).strip(" .")
+            mate = next((c for c in legends if c is not card and _name_matches(c, wanted)), None)
+            if mate:
+                pair = [c for c in legends if c is card or c is mate]
+                return pair[0], pair[1]
+
+    # 2. "Choose a Background" — the partner is a legendary Background enchantment.
+    background = next((c for c in cards if _is_background(c) and not _is_legendary_creature(c)), None)
+    if background:
+        chooser = next((c for c in legends if "choose a background" in _card_text(c)), None)
+        if chooser:
+            return chooser, background
+
+    # 3. Exactly two legendary creatures where one carries a partner mechanic.
+    if len(legends) == 2 and (_has_partner_mechanic(legends[0]) or _has_partner_mechanic(legends[1])):
+        return legends[0], legends[1]
+
+    # 4. Otherwise (single legend, or 3+ with no safe guess) the first one wins.
+    return legends[0], None
+
+
 # ─── Background Image Refresh ───
 
 def refresh_all_images():
@@ -81,9 +157,10 @@ def refresh_all_images():
         for entry in missing_cmd:
             url = id_to_url.get(entry["scryfall_id"])
             if url:
-                update_deck_commander_image(entry["deck_id"], url)
+                update_deck_commander_image(entry["deck_id"], url, slot=entry.get("slot", 1))
 
-def _fetch_and_save_images(deck_id, scryfall_ids, cmd_name, cmd_sf_id):
+def _fetch_and_save_images(deck_id, scryfall_ids, cmd_name, cmd_sf_id,
+                           cmd2_name=None, cmd2_sf_id=None):
     id_to_url = fetch_card_images_bulk(scryfall_ids)
     card_rows = get_deck_cards(deck_id)
     scryfall_to_db_id = {c["scryfall_id"]: c["id"] for c in card_rows if c.get("scryfall_id")}
@@ -91,10 +168,11 @@ def _fetch_and_save_images(deck_id, scryfall_ids, cmd_name, cmd_sf_id):
         card_db_id = scryfall_to_db_id.get(scryfall_id)
         if card_db_id and image_url:
             update_card_image(card_db_id, image_url)
-    if cmd_name and cmd_sf_id:
-        cmd_image = id_to_url.get(cmd_sf_id, "")
-        if cmd_image:
-            update_deck_commander_image(deck_id, cmd_image)
+    for slot, (name, sf_id) in enumerate(((cmd_name, cmd_sf_id), (cmd2_name, cmd2_sf_id)), start=1):
+        if name and sf_id:
+            cmd_image = id_to_url.get(sf_id, "")
+            if cmd_image:
+                update_deck_commander_image(deck_id, cmd_image, slot=slot)
 
 # ─── Startup ───
 
@@ -119,8 +197,7 @@ def api_add_deck(req: CreateDeckRequest):
 
     deck_id = add_deck(name, color=req.color or None)
     results = []
-    commander_name = None
-    commander_image_url = None
+    resolved_cards = []
 
     if req.card_list.strip():
         parsed = parse_card_list(req.card_list)
@@ -136,18 +213,19 @@ def api_add_deck(req: CreateDeckRequest):
                     colors=resolved.get("colors", []), color_identity=resolved.get("color_identity", []),
                     cmc=resolved.get("cmc", 0), type_line=resolved.get("type_line", ""),
                 )
-                if not commander_name:
-                    tl = (resolved.get("type_line", "") or "").lower()
-                    if "legendary" in tl and "creature" in tl:
-                        commander_name = resolved["name"]
-                        commander_image_url = resolved["image_url"]
+                resolved_cards.append(resolved)
                 results.append({"status": "ok", "requested": card_name, "resolved": resolved["name"], "quantity": quantity, "image_url": resolved["image_url"]})
             else:
                 add_card_to_deck(deck_id, card_name=card_name, quantity=quantity, set_code=set_code or "")
                 results.append({"status": "not_found", "requested": card_name, "quantity": quantity})
 
-    if commander_name:
-        update_deck_commander(deck_id, commander_name, commander_image_url)
+    commander, commander2 = detect_commanders(resolved_cards)
+    if commander:
+        update_deck_commander(
+            deck_id, commander["name"], commander["image_url"],
+            commander2["name"] if commander2 else "",
+            commander2["image_url"] if commander2 else "",
+        )
 
     return {"id": deck_id, "name": name, "results": results}
 
@@ -173,7 +251,9 @@ def api_import_deck(req: ImportDeckRequest):
     deck_id = add_deck(name, color=req.color or None)
     results = []
     cmd_name = moxfield_deck.get("commander_name")
+    cmd2_name = moxfield_deck.get("commander2_name")
     cmd_sf_id = None
+    cmd2_sf_id = None
     all_scryfall_ids = []
 
     for entry in moxfield_deck["cards"]:
@@ -187,15 +267,22 @@ def api_import_deck(req: ImportDeckRequest):
             all_scryfall_ids.append(scryfall_id)
         if card_name == cmd_name:
             cmd_sf_id = scryfall_id
+        if cmd2_name and card_name == cmd2_name:
+            cmd2_sf_id = scryfall_id
         results.append({"status": "ok", "requested": card_name, "resolved": card_name, "quantity": quantity})
 
     if cmd_name:
-        update_deck_commander(deck_id, cmd_name, "")
+        update_deck_commander(deck_id, cmd_name, "", cmd2_name or "", "")
 
     if all_scryfall_ids:
-        if cmd_sf_id and cmd_sf_id not in all_scryfall_ids:
-            all_scryfall_ids.append(cmd_sf_id)
-        threading.Thread(target=_fetch_and_save_images, args=(deck_id, all_scryfall_ids, cmd_name, cmd_sf_id), daemon=True).start()
+        for sf_id in (cmd_sf_id, cmd2_sf_id):
+            if sf_id and sf_id not in all_scryfall_ids:
+                all_scryfall_ids.append(sf_id)
+        threading.Thread(
+            target=_fetch_and_save_images,
+            args=(deck_id, all_scryfall_ids, cmd_name, cmd_sf_id, cmd2_name, cmd2_sf_id),
+            daemon=True,
+        ).start()
 
     return {"id": deck_id, "name": name, "results": results}
 
@@ -223,7 +310,10 @@ def api_update_deck_color(deck_id: int, req: UpdateColorRequest):
 
 @app.put("/api/decks/{deck_id}/commander")
 def api_update_deck_commander_route(deck_id: int, req: UpdateCommanderRequest):
-    update_deck_commander(deck_id, req.commander_name or "", req.commander_image_url or "")
+    update_deck_commander(
+        deck_id, req.commander_name or "", req.commander_image_url or "",
+        req.commander2_name or "", req.commander2_image_url or "",
+    )
     return {"ok": True}
 
 @app.get("/api/decks/{deck_id}/color-identity")
@@ -335,13 +425,18 @@ def api_refresh_deck_images(deck_id: int):
             if card_db_id and image_url:
                 update_card_image(card_db_id, image_url)
     deck = get_deck(deck_id)
-    if deck and deck.get("commander_name"):
-        cmd_rows = [c for c in card_rows if c["card_name"] == deck["commander_name"] and c.get("scryfall_id")]
-        if cmd_rows:
+    if deck:
+        for slot, name_col in ((1, "commander_name"), (2, "commander2_name")):
+            cmd_name = deck.get(name_col)
+            if not cmd_name:
+                continue
+            cmd_rows = [c for c in card_rows if c["card_name"] == cmd_name and c.get("scryfall_id")]
+            if not cmd_rows:
+                continue
             cmd_images = fetch_card_images_bulk([cmd_rows[0]["scryfall_id"]])
             img = cmd_images.get(cmd_rows[0]["scryfall_id"])
             if img:
-                update_deck_commander_image(deck_id, img)
+                update_deck_commander_image(deck_id, img, slot=slot)
     return {"ok": True}
 
 @app.post("/api/refresh-images")

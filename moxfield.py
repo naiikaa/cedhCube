@@ -33,8 +33,10 @@ def fetch_moxfield_deck(public_id):
     Returns a dict with:
         - name: deck name
         - format: deck format (e.g. 'commander')
-        - commander_name: name of the commander card (or None)
-        - commander_image_url: image URL of the commander (or None)
+        - commander_name: name of the first commander card (or None)
+        - commander_image_url: image URL of the first commander (or None)
+        - commander2_name: name of the second commander (partner), or ''
+        - commander2_image_url: image URL of the second commander, or ''
         - cards: list of (quantity, card_name, set_code, scryfall_id, image_url,
                           mana_cost, type_line, colors, color_identity, cmc)
     Returns None if the deck could not be fetched.
@@ -50,15 +52,21 @@ def fetch_moxfield_deck(public_id):
     name = data.get("name", "Imported Deck")
     fmt = data.get("format", "commander")
 
-    # Extract commander info
+    # Extract commander info (Moxfield returns 1 or 2 entries for partner decks)
     commander_name = None
     commander_image_url = None
+    commander2_name = ""
+    commander2_image_url = ""
     commanders = data.get("commanders", {})
-    if commanders:
-        first_cmd = next(iter(commanders.values()))
-        cmd_card = first_cmd.get("card", {})
+    commander_entries = list(commanders.values())
+    if commander_entries:
+        cmd_card = commander_entries[0].get("card", {})
         commander_name = cmd_card.get("name", "")
         commander_image_url = _get_card_image_url(cmd_card)
+    if len(commander_entries) >= 2:
+        cmd2_card = commander_entries[1].get("card", {})
+        commander2_name = cmd2_card.get("name", "")
+        commander2_image_url = _get_card_image_url(cmd2_card)
 
     # Build cards list: commanders first, then mainboard
     cards = []
@@ -86,6 +94,8 @@ def fetch_moxfield_deck(public_id):
         "format": fmt,
         "commander_name": commander_name,
         "commander_image_url": commander_image_url,
+        "commander2_name": commander2_name,
+        "commander2_image_url": commander2_image_url,
         "cards": cards,
     }
 
