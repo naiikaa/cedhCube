@@ -4,6 +4,7 @@ import threading
 import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from database import (
@@ -17,6 +18,7 @@ from database import (
 )
 from scryfall import parse_card_list, validate_and_resolve_card, lookup_card, fetch_card_detail
 from moxfield import fetch_moxfield_deck, extract_deck_id, fetch_card_images_bulk
+from edhtop16 import commander_key, get_commander_entries, get_entry_maindeck
 
 app = FastAPI(title="cEDHcube")
 
@@ -65,6 +67,13 @@ class UpdateCardRequest(BaseModel):
 class ImportDeckRequest(BaseModel):
     url: str
     color: Optional[str] = None
+
+class MetaDecksRequest(BaseModel):
+    deck_id: int
+
+class MetaCompareRequest(BaseModel):
+    deck_id: int
+    entry_id: str
 
 # ─── Commander Detection ───
 
@@ -443,6 +452,99 @@ def api_refresh_deck_images(deck_id: int):
 def api_refresh_all_images():
     threading.Thread(target=refresh_all_images, daemon=True).start()
     return {"ok": True}
+
+# ─── Meta (edhtop16) ───
+
+def _primary_name(name):
+    """edhtop16 lists DFCs as "Front // Back"; the app stores the front name."""
+    return (name or "").split(" // ")[0].strip()
+
+
+def _deck_commander_key(deck):
+    return commander_key(deck.get("commander_name") or "",
+                         deck.get("commander2_name") or "")
+
+
+@app.post("/api/meta/decks")
+def api_meta_decks(req: MetaDecksRequest):
+    deck = get_deck(req.deck_id)
+    if not deck:
+        return JSONResponse({"error": "Deck not found"}, status_code=404)
+
+    key = _deck_commander_key(deck)
+    if not key:
+        return {"commander": "", "deck_id": req.deck_id, "entries": []}
+
+    try:
+        entries = get_commander_entries(key)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    return {"commander": key, "deck_id": req.deck_id, "entries": entries}
+
+
+@app.post("/api/meta/compare")
+def api_meta_compare(req: MetaCompareRequest):
+    deck = get_deck(req.deck_id)
+    if not deck:
+        return JSONResponse({"error": "Deck not found"}, status_code=404)
+
+    key = _deck_commander_key(deck)
+    if not key:
+        return JSONResponse({"error": "Deck has no commander"}, status_code=404)
+
+    try:
+        entries = get_commander_entries(key)
+        maindeck = get_entry_maindeck(key, req.entry_id)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    entry = next((e for e in entries if e.get("id") == req.entry_id), None)
+    if entry is None or not maindeck:
+        return JSONResponse({"error": "Meta entry not found"}, status_code=404)
+
+    my_cards = get_deck_cards(req.deck_id) or []
+    my_by_name = {}
+    for row in my_cards:
+        norm = _primary_name(row.get("card_name")).lower()
+        if norm and norm not in my_by_name:
+            my_by_name[norm] = row
+
+    overlap, missing, seen = [], [], set()
+    meta_names = set()
+    for card in maindeck:
+        norm = _primary_name(card.get("name")).lower()
+        if not norm:
+            continue
+        meta_names.add(norm)
+        if norm in seen:
+            continue
+        seen.add(norm)
+        mine = my_by_name.get(norm)
+        entry_card = {
+            "name": card.get("name") or "",
+            "mana_cost": card.get("mana_cost") or "",
+            "image_url": card.get("image_url") or "",
+            "quantity": (mine or {}).get("quantity") or 1,
+        }
+        (overlap if mine else missing).append(entry_card)
+
+    mine_only = [
+        {
+            "name": row.get("card_name") or "",
+            "mana_cost": row.get("mana_cost") or "",
+            "image_url": row.get("image_url") or "",
+            "quantity": row.get("quantity") or 1,
+        }
+        for norm, row in my_by_name.items() if norm not in meta_names
+    ]
+
+    return {
+        "entry": entry,
+        "meta_maindeck_count": len(maindeck),
+        "overlap": overlap,
+        "missing_from_mine": missing,
+        "my_cards_not_in_meta": mine_only,
+    }
 
 
 if __name__ == "__main__":

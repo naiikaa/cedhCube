@@ -1,3 +1,5 @@
+import type { MetaCompareResult, MetaDeckOverview } from './types';
+
 const BASE = '/api';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -70,6 +72,18 @@ export const api = {
     request<{ id: number; name: string; results: import('./types').CardResult[] }>('/decks/import', {
       method: 'POST',
       body: JSON.stringify({ url, color }),
+    }),
+
+  // Meta (edhtop16)
+  getMetaForDeck: (deckId: number) =>
+    request<MetaDeckOverview>('/meta/decks', {
+      method: 'POST',
+      body: JSON.stringify({ deck_id: deckId }),
+    }),
+  getMetaCompare: (deckId: number, entryId: string) =>
+    request<MetaCompareResult>('/meta/compare', {
+      method: 'POST',
+      body: JSON.stringify({ deck_id: deckId, entry_id: entryId }),
     }),
 
   // Images

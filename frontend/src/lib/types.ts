@@ -72,6 +72,39 @@ export interface CardResult {
   image_url?: string;
 }
 
+export interface MetaEntry {
+  id: string;
+  standing: number | null;
+  wins: number;
+  wins_bracket: number;
+  wins_swiss: number;
+  player: string;
+  tournament_name: string;
+  tournament_date: string;
+  tournament_size: number;
+}
+
+export interface MetaDeckOverview {
+  commander: string;
+  deck_id: number;
+  entries: MetaEntry[];
+}
+
+export interface MetaCompareCard {
+  name: string;
+  mana_cost: string;
+  image_url: string;
+  quantity: number;
+}
+
+export interface MetaCompareResult {
+  entry: MetaEntry;
+  meta_maindeck_count: number;
+  overlap: MetaCompareCard[];
+  missing_from_mine: MetaCompareCard[];
+  my_cards_not_in_meta: MetaCompareCard[];
+}
+
 export interface ApiError {
   error: string;
 }
