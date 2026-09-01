@@ -4,3 +4,6 @@ __pycache__/
 instance/
 .env
 venv/
+node_modules/
+.dev/
+docs/screenshots/*.png
