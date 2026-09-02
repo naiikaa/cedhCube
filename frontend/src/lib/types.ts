@@ -105,6 +105,38 @@ export interface MetaCompareResult {
   my_cards_not_in_meta: MetaCompareCard[];
 }
 
+export interface MetaStockEntryRef {
+  id: string;
+  standing: number | null;
+  wins: number;
+  player: string;
+  tournament_name: string;
+  tournament_date: string;
+  tournament_size: number;
+}
+
+export interface MetaStockCard {
+  name: string;
+  mana_cost: string;
+  image_url: string;
+  type: string;
+  count: number;
+  share: number;
+  quantity: number;
+  in_my_deck: boolean;
+  in_decks: string[];
+}
+
+export interface MetaStockResult {
+  commander: string;
+  deck_id: number;
+  top_n: number;
+  decks_analyzed: number;
+  analyzed_entries: MetaStockEntryRef[];
+  stock: MetaStockCard[];
+  missed_count: number;
+}
+
 export interface ApiError {
   error: string;
 }

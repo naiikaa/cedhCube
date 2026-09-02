@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeftRight, Crown, MinusCircle, PlusCircle, Swords, Trophy, X } from 'lucide-react';
+import {
+  ArrowLeft, ArrowLeftRight, Check, Crown, Filter, Layers,
+  MinusCircle, PlusCircle, Swords, Trophy, X,
+} from 'lucide-react';
 import { api } from '../lib/api';
-import type { Deck, MetaCompareCard, MetaCompareResult, MetaDeckOverview, MetaEntry } from '../lib/types';
+import type {
+  Deck, MetaCompareCard, MetaCompareResult, MetaDeckOverview, MetaEntry,
+  MetaStockCard, MetaStockResult,
+} from '../lib/types';
 import { ManaCost } from './ManaPip';
 import { CardImage, Spinner } from './UI';
 
@@ -55,6 +61,127 @@ function CompareSection({
   );
 }
 
+/** One aggregate stock card; click to reveal which meta players run it. */
+function StockRow({ card, decksAnalyzed }: { card: MetaStockCard; decksAnalyzed: number }) {
+  const [open, setOpen] = useState(false);
+  const pct = Math.round(card.share * 100);
+  // Backend ships every entry that runs the card; keep the reveal readable.
+  const players = card.in_decks.slice(0, 12);
+  const extraPlayers = card.in_decks.length - players.length;
+  return (
+    <div className="meta-stock-row">
+      <button
+        type="button"
+        className="card-row meta-stock-btn"
+        aria-expanded={open}
+        onClick={() => setOpen(v => !v)}
+      >
+        <CardImage url={card.image_url} name={card.name} size={34} style={{ borderRadius: 3 }} />
+        <span className="meta-stock-body">
+          <span className="meta-card-name">{card.name}</span>
+          {card.type ? <span className="meta-stock-type">{card.type}</span> : null}
+        </span>
+        <ManaCost cost={card.mana_cost} />
+        <span
+          className={`meta-count meta-stock-badge${card.count === decksAnalyzed ? ' is-unanimous' : ''}`}
+          title={`${pct}% of analyzed decks`}
+        >
+          {card.count}/{decksAnalyzed}
+        </span>
+        {card.in_my_deck ? (
+          <Check size={14} className="meta-stock-have" aria-label="In your deck" />
+        ) : (
+          <span className="meta-stock-have-gap" aria-hidden="true" />
+        )}
+      </button>
+      {open ? (
+        <p className="meta-stock-players">
+          {players.length > 0
+            ? players.join(' · ') + (extraPlayers > 0 ? ` · +${extraPlayers} more` : '')
+            : 'No player data.'}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: string }) {
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  const missing = stock.stock.filter(c => !c.in_my_deck);
+  const rows = onlyMissing ? missing : stock.stock;
+
+  if (stock.decks_analyzed === 0) {
+    return (
+      <div className="empty-state">
+        <Trophy aria-hidden="true" />
+        No meta decklists available for this commander yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="meta-stock">
+      <div className="meta-stock-head">
+        <span className="meta-stock-summary">
+          <Layers size={14} aria-hidden="true" />
+          Analyzed {stock.decks_analyzed} top decks for{' '}
+          <span className="meta-commander-name">{stock.commander}</span>
+          {deckName ? ` · vs ${deckName}` : ''}
+        </span>
+        <span className="meta-count">
+          {stock.missed_count} cards the meta plays that you don't
+        </span>
+      </div>
+
+      <section className="meta-section meta-section-missing">
+        <div className="section-head">
+          <h3>
+            <PlusCircle size={14} aria-hidden="true" />
+            You're missing these
+          </h3>
+          <span className="head-action meta-count">{missing.length}</span>
+        </div>
+        {missing.length === 0 ? (
+          <p className="meta-list-empty">Nothing — you run every stock card.</p>
+        ) : (
+          <div className="meta-card-list">
+            {missing.map(c => (
+              <StockRow key={c.name} card={c} decksAnalyzed={stock.decks_analyzed} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="meta-section">
+        <div className="section-head">
+          <h3>
+            <Swords size={14} aria-hidden="true" />
+            Full stock list
+          </h3>
+          <button
+            type="button"
+            className="chip head-action"
+            aria-pressed={onlyMissing}
+            onClick={() => setOnlyMissing(v => !v)}
+          >
+            <Filter size={12} aria-hidden="true" />
+            Only show what I'm missing
+          </button>
+        </div>
+        {rows.length === 0 ? (
+          <p className="meta-list-empty">Nothing here.</p>
+        ) : (
+          <div className="meta-card-list meta-stock-full">
+            {rows.map(c => (
+              <StockRow key={c.name} card={c} decksAnalyzed={stock.decks_analyzed} />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export interface MetaTabProps {
   decks: Deck[];
   onError: (message: string) => void;
@@ -69,6 +196,12 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
   const [compare, setCompare] = useState<MetaCompareResult | null>(null);
   const [compareEntryId, setCompareEntryId] = useState('');
   const [compareLoading, setCompareLoading] = useState(false);
+
+  const [view, setView] = useState<'entries' | 'stock'>('entries');
+  const [topN, setTopN] = useState(10);
+  const [stock, setStock] = useState<MetaStockResult | null>(null);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockError, setStockError] = useState('');
 
   // Default to the first deck once decks arrive.
   useEffect(() => {
@@ -100,6 +233,21 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
       .catch(e => { onError(errText(e)); setCompareEntryId(''); })
       .finally(() => setCompareLoading(false));
   }, [deckId, onError]);
+
+  const loadStock = useCallback((id: number, n: number) => {
+    setStockLoading(true);
+    setStockError('');
+    setStock(null);
+    api.getMetaStock(id, n)
+      .then(setStock)
+      .catch(e => { setStockError(errText(e)); onError(errText(e)); })
+      .finally(() => setStockLoading(false));
+  }, [onError]);
+
+  useEffect(() => {
+    if (view !== 'stock' || deckId === null) return;
+    loadStock(deckId, topN);
+  }, [view, deckId, topN, loadStock]);
 
   const closeCompare = () => { setCompareEntryId(''); setCompare(null); };
 
@@ -133,6 +281,27 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
             >
               {decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
+            <label className="filter-label" htmlFor="meta-topn-select">Top decks</label>
+            <select
+              id="meta-topn-select"
+              className="field"
+              style={{ width: 'auto', flex: '0 1 auto' }}
+              value={topN}
+              onChange={e => setTopN(Number(e.target.value))}
+            >
+              {[5, 10, 15, 25].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            {view === 'stock' ? (
+              <button type="button" className="chip" onClick={() => setView('entries')}>
+                <ArrowLeft size={12} aria-hidden="true" />
+                Back to top decks
+              </button>
+            ) : (
+              <button type="button" className="chip" onClick={() => { closeCompare(); setView('stock'); }}>
+                <Layers size={12} aria-hidden="true" />
+                Meta stock list
+              </button>
+            )}
           </div>
 
           {selectedDeck && overview && (
@@ -143,7 +312,18 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
             </div>
           )}
 
-          {overviewLoading ? (
+          {view === 'stock' ? (
+            stockLoading ? (
+              <div className="empty-state"><Spinner size={22} /></div>
+            ) : stockError ? (
+              <div className="empty-state">
+                <X aria-hidden="true" />
+                {stockError}
+              </div>
+            ) : stock ? (
+              <StockView stock={stock} deckName={selectedDeck?.name || ''} />
+            ) : null
+          ) : overviewLoading ? (
             <div className="empty-state"><Spinner size={22} /></div>
           ) : overviewError ? (
             <div className="empty-state">

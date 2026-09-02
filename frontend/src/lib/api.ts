@@ -1,4 +1,4 @@
-import type { MetaCompareResult, MetaDeckOverview } from './types';
+import type { MetaCompareResult, MetaDeckOverview, MetaStockResult } from './types';
 
 const BASE = '/api';
 
@@ -84,6 +84,11 @@ export const api = {
     request<MetaCompareResult>('/meta/compare', {
       method: 'POST',
       body: JSON.stringify({ deck_id: deckId, entry_id: entryId }),
+    }),
+  getMetaStock: (deckId: number, topN: number) =>
+    request<MetaStockResult>('/meta/stock', {
+      method: 'POST',
+      body: JSON.stringify({ deck_id: deckId, top_n: topN }),
     }),
 
   // Images
