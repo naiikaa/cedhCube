@@ -58,7 +58,7 @@ def _escape(value: str) -> str:
 
 
 def _entries_query(commander_key_str: str, first: int, with_maindeck: bool) -> str:
-    maindeck = "maindeck { name manaCost imageUrls }" if with_maindeck else ""
+    maindeck = "maindeck { name manaCost imageUrls type }" if with_maindeck else ""
     return f"""
     query {{
       commander(name: "{_escape(commander_key_str)}") {{
@@ -117,6 +117,7 @@ def _maindeck_cards(node: dict) -> list:
             "name": card.get("name") or "",
             "mana_cost": card.get("manaCost") or "",
             "image_url": images[0] if images else "",
+            "type": card.get("type") or "",
         })
     return cards
 

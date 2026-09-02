@@ -75,6 +75,10 @@ class MetaCompareRequest(BaseModel):
     deck_id: int
     entry_id: str
 
+class MetaStockRequest(BaseModel):
+    deck_id: int
+    top_n: int = 10
+
 # ─── Commander Detection ───
 
 # "Partner with <Name>" is followed by reminder text in parentheses, so the name
@@ -544,6 +548,87 @@ def api_meta_compare(req: MetaCompareRequest):
         "overlap": overlap,
         "missing_from_mine": missing,
         "my_cards_not_in_meta": mine_only,
+    }
+
+
+@app.post("/api/meta/stock")
+def api_meta_stock(req: MetaStockRequest):
+    """Aggregate what the top-N meta decks for this commander collectively play."""
+    deck = get_deck(req.deck_id)
+    if not deck:
+        return JSONResponse({"error": "Deck not found"}, status_code=404)
+
+    key = _deck_commander_key(deck)
+    if not key:
+        return JSONResponse({"error": "Deck has no commander"}, status_code=404)
+
+    top_n = min(max(req.top_n, 1), 25)
+
+    analyzed, stock = [], {}
+    try:
+        entries = get_commander_entries(key, first=top_n)
+        # Sequential on purpose: get_entry_maindeck caches every entry it sees for
+        # 15 minutes, so the loop costs one edhtop16 round trip, not top_n bursts.
+        for entry in entries[:top_n]:
+            maindeck = get_entry_maindeck(key, entry.get("id") or "")
+            if not maindeck:
+                continue
+            analyzed.append(entry)
+            player = entry.get("player") or ""
+            seen = set()
+            for card in maindeck:
+                name = _primary_name(card.get("name"))
+                norm = name.lower()
+                if not norm or norm in seen:
+                    continue
+                seen.add(norm)
+                agg = stock.get(norm)
+                if agg is None:
+                    agg = stock[norm] = {
+                        "name": name,
+                        "mana_cost": card.get("mana_cost") or "",
+                        "image_url": card.get("image_url") or "",
+                        "type": card.get("type") or "",
+                        "count": 0,
+                        "in_decks": [],
+                    }
+                agg["count"] += 1
+                if player:
+                    agg["in_decks"].append(player)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    decks_analyzed = len(analyzed)
+    my_by_name = {}
+    for row in get_deck_cards(req.deck_id) or []:
+        norm = _primary_name(row.get("card_name")).lower()
+        if norm and norm not in my_by_name:
+            my_by_name[norm] = row
+
+    cards = []
+    for norm, agg in stock.items():
+        mine = my_by_name.get(norm)
+        cards.append({
+            "name": agg["name"],
+            "mana_cost": agg["mana_cost"],
+            "image_url": agg["image_url"],
+            "type": agg["type"],
+            "count": agg["count"],
+            "share": agg["count"] / decks_analyzed if decks_analyzed else 0.0,
+            "quantity": (mine or {}).get("quantity") or 0,
+            "in_my_deck": mine is not None,
+            "in_decks": agg["in_decks"],
+        })
+    cards.sort(key=lambda c: (-c["count"], c["name"].lower()))
+
+    return {
+        "commander": key,
+        "deck_id": req.deck_id,
+        "top_n": top_n,
+        "decks_analyzed": decks_analyzed,
+        "analyzed_entries": analyzed,
+        "stock": cards,
+        "missed_count": sum(1 for c in cards if not c["in_my_deck"]),
     }
 
 
