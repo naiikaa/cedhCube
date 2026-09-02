@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowLeft, ArrowLeftRight, Check, Crown, Filter, Layers,
   MinusCircle, PlusCircle, Swords, Trophy, X,
@@ -20,6 +21,42 @@ const fmtDate = (iso: string) => {
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** Swap any Scryfall image size for `large` so hover previews show the whole card. */
+const previewUrl = (url: string) => {
+  if (!url) return '';
+  return url.replace(/\/(art_crop|normal)\//, '/large/');
+};
+
+/** Hover a small thumb → enlarge the full card next to it (portal'd so scroll can't clip it). */
+function CardZoom({ url, name, children }: { url: string; name: string; children: ReactNode }) {
+  const [pop, setPop] = useState<{ left: number; top: number } | null>(null);
+  const large = previewUrl(url);
+  if (!large) return <>{children}</>;
+  const POP_W = 230;
+  return (
+    <span
+      className="card-zoom"
+      onMouseEnter={e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const placeLeft = r.right + POP_W + 16 > window.innerWidth;
+        setPop({ left: placeLeft ? r.left - POP_W - 8 : r.right + 8, top: r.top });
+      }}
+      onMouseLeave={() => setPop(null)}
+    >
+      {children}
+      {pop && createPortal(
+        <img
+          className="card-zoom-pop"
+          src={large}
+          alt={name}
+          style={{ left: pop.left, top: pop.top }}
+        />,
+        document.body,
+      )}
+    </span>
+  );
+}
+
 function CardList({ cards, showQty }: { cards: MetaCompareCard[]; showQty: boolean }) {
   if (cards.length === 0) {
     return <p className="meta-list-empty">Nothing here.</p>;
@@ -28,7 +65,9 @@ function CardList({ cards, showQty }: { cards: MetaCompareCard[]; showQty: boole
     <div className="meta-card-list">
       {cards.map(c => (
         <div key={c.name} className="card-row">
-          <CardImage url={c.image_url} name={c.name} size={34} style={{ borderRadius: 3 }} />
+          <CardZoom url={c.image_url} name={c.name}>
+            <CardImage url={c.image_url} name={c.name} size={34} style={{ borderRadius: 3 }} />
+          </CardZoom>
           <span className="meta-card-name">{c.name}</span>
           <ManaCost cost={c.mana_cost} />
           {showQty && c.quantity > 1 ? <span className="meta-qty">×{c.quantity}</span> : null}
@@ -76,7 +115,9 @@ function StockRow({ card, decksAnalyzed }: { card: MetaStockCard; decksAnalyzed:
         aria-expanded={open}
         onClick={() => setOpen(v => !v)}
       >
-        <CardImage url={card.image_url} name={card.name} size={34} style={{ borderRadius: 3 }} />
+        <CardZoom url={card.image_url} name={card.name}>
+          <CardImage url={card.image_url} name={card.name} size={34} style={{ borderRadius: 3 }} />
+        </CardZoom>
         <span className="meta-stock-body">
           <span className="meta-card-name">{card.name}</span>
           {card.type ? <span className="meta-stock-type">{card.type}</span> : null}
@@ -362,7 +403,7 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
 
           {compareEntryId && (
             <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) closeCompare(); }}>
-              <div className="modal-panel" style={{ maxWidth: 780 }} role="dialog" aria-modal="true" aria-label="Meta deck comparison">
+              <div className="modal-panel meta-compare-panel" style={{ maxWidth: 940 }} role="dialog" aria-modal="true" aria-label="Meta deck comparison">
                 <div className="modal-head">
                   <div style={{ minWidth: 0 }}>
                     <h2 className="modal-title">
