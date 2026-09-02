@@ -469,6 +469,26 @@ def _deck_commander_key(deck):
                          deck.get("commander2_name") or "")
 
 
+def _norm(name):
+    """Best-effort normalised name for cross-source matching. The same card can
+    be spelled differently in our DB vs edhtop16: DFCs ('Front // Back'), sticker
+    names whose blank-underscore count varies ('________ Goblin' vs '_____ Goblin'),
+    and stray whitespace. Iron all of those out so the card matches.
+    """
+    s = _primary_name(name).lower().strip()
+    s = s.replace("_", "")          # sticker/Acorn blanks use varying underscore counts
+    return " ".join(s.split())      # collapse internal whitespace
+
+
+def _deck_commander_norms(deck):
+    """Normalised names of the deck's commander(s) — command-zone constants that
+    must never appear in a maindeck comparison (edhtop16 frequently omits the
+    commander from its maindeck dump, which would otherwise false-flag it as
+    'you play, meta doesn't')."""
+    return {_norm(deck.get(f)) for f in ("commander_name", "commander2_name")
+            if (deck.get(f) or "").strip()}
+
+
 @app.post("/api/meta/decks")
 def api_meta_decks(req: MetaDecksRequest):
     deck = get_deck(req.deck_id)
@@ -507,18 +527,21 @@ def api_meta_compare(req: MetaCompareRequest):
         return JSONResponse({"error": "Meta entry not found"}, status_code=404)
 
     my_cards = get_deck_cards(req.deck_id) or []
+    commanders = _deck_commander_norms(deck)
     my_by_name = {}
     for row in my_cards:
-        norm = _primary_name(row.get("card_name")).lower()
+        norm = _norm(row.get("card_name"))
+        if norm in commanders:
+            continue  # command-zone card, not a maindeck slot
         if norm and norm not in my_by_name:
             my_by_name[norm] = row
 
     overlap, missing, seen = [], [], set()
     meta_names = set()
     for card in maindeck:
-        norm = _primary_name(card.get("name")).lower()
-        if not norm:
-            continue
+        norm = _norm(card.get("name"))
+        if not norm or norm in commanders:
+            continue  # constant for both decks; edhtop16 often omits it
         meta_names.add(norm)
         if norm in seen:
             continue
@@ -564,6 +587,7 @@ def api_meta_stock(req: MetaStockRequest):
 
     top_n = min(max(req.top_n, 1), 25)
 
+    commanders = _deck_commander_norms(deck)
     analyzed, stock = [], {}
     try:
         entries = get_commander_entries(key, first=top_n)
@@ -577,15 +601,16 @@ def api_meta_stock(req: MetaStockRequest):
             player = entry.get("player") or ""
             seen = set()
             for card in maindeck:
-                name = _primary_name(card.get("name"))
-                norm = name.lower()
-                if not norm or norm in seen:
+                norm = _norm(card.get("name"))
+                if not norm or norm in commanders:
+                    continue  # constant for both decks; edhtop16 often omits it
+                if norm in seen:
                     continue
                 seen.add(norm)
                 agg = stock.get(norm)
                 if agg is None:
                     agg = stock[norm] = {
-                        "name": name,
+                        "name": _primary_name(card.get("name")),
                         "mana_cost": card.get("mana_cost") or "",
                         "image_url": card.get("image_url") or "",
                         "type": card.get("type") or "",
@@ -601,7 +626,9 @@ def api_meta_stock(req: MetaStockRequest):
     decks_analyzed = len(analyzed)
     my_by_name = {}
     for row in get_deck_cards(req.deck_id) or []:
-        norm = _primary_name(row.get("card_name")).lower()
+        norm = _norm(row.get("card_name"))
+        if norm in commanders:
+            continue
         if norm and norm not in my_by_name:
             my_by_name[norm] = row
 
