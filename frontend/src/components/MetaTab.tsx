@@ -38,6 +38,12 @@ const previewUrl = (url: string) => {
   return url.replace(/\/(art_crop|normal)\//, '/large/');
 };
 
+/** Normalise any Scryfall card-frame image to its `art_crop` cutout for row thumbs. */
+const cropUrl = (url: string) => {
+  if (!url) return '';
+  return url.replace(/\/(normal|large|small|png)\//, '/art_crop/');
+};
+
 /** Hover a small thumb → enlarge the full card next to it (portal'd so scroll can't clip it). */
 function CardZoom({ url, name, children }: { url: string; name: string; children: ReactNode }) {
   const [pop, setPop] = useState<{ left: number; top: number } | null>(null);
@@ -77,7 +83,7 @@ function CardList({ cards, showQty }: { cards: MetaCompareCard[]; showQty: boole
       {cards.map(c => (
         <div key={c.name} className="card-row">
           <CardZoom url={c.image_url} name={c.name}>
-            <CardImage url={c.image_url} name={c.name} size={34} style={{ borderRadius: 3 }} />
+            <CardImage url={cropUrl(c.image_url)} name={c.name} size={34} style={{ borderRadius: 3 }} />
           </CardZoom>
           <span className="meta-card-name">{c.name}</span>
           <ManaCost cost={c.mana_cost} />
