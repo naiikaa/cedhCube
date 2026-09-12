@@ -21,6 +21,17 @@ const fmtDate = (iso: string) => {
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** edhtop16 `TimePeriod` enum values, default first. */
+const TIME_OPTIONS = [
+  { value: 'THREE_MONTHS', label: '3 months' },
+  { value: 'ONE_MONTH', label: '1 month' },
+  { value: 'SIX_MONTHS', label: '6 months' },
+  { value: 'ONE_YEAR', label: '1 year' },
+  { value: 'POST_BAN', label: 'Post-ban' },
+  { value: 'ALL_TIME', label: 'All time' },
+];
+const SIZE_OPTIONS = [16, 32, 64, 128];
+
 /** Swap any Scryfall image size for `large` so hover previews show the whole card. */
 const previewUrl = (url: string) => {
   if (!url) return '';
@@ -240,6 +251,8 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
 
   const [view, setView] = useState<'entries' | 'stock'>('entries');
   const [topN, setTopN] = useState(10);
+  const [timePeriod, setTimePeriod] = useState('THREE_MONTHS');
+  const [minEventSize, setMinEventSize] = useState(16);
   const [stock, setStock] = useState<MetaStockResult | null>(null);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockError, setStockError] = useState('');
@@ -249,11 +262,11 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
     if (deckId === null && decks.length > 0) setDeckId(decks[0].id);
   }, [decks, deckId]);
 
-  const loadOverview = useCallback((id: number) => {
+  const loadOverview = useCallback((id: number, period: string, size: number) => {
     setOverviewLoading(true);
     setOverviewError('');
     setOverview(null);
-    api.getMetaForDeck(id)
+    api.getMetaForDeck(id, period, size)
       .then(setOverview)
       .catch(e => { setOverviewError(errText(e)); onError(errText(e)); })
       .finally(() => setOverviewLoading(false));
@@ -261,25 +274,25 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
 
   useEffect(() => {
     if (deckId === null) return;
-    loadOverview(deckId);
-  }, [deckId, loadOverview]);
+    loadOverview(deckId, timePeriod, minEventSize);
+  }, [deckId, timePeriod, minEventSize, loadOverview]);
 
   const openCompare = useCallback((entry: MetaEntry) => {
     if (deckId === null) return;
     setCompareEntryId(entry.id);
     setCompare(null);
     setCompareLoading(true);
-    api.getMetaCompare(deckId, entry.id)
+    api.getMetaCompare(deckId, entry.id, timePeriod, minEventSize)
       .then(setCompare)
       .catch(e => { onError(errText(e)); setCompareEntryId(''); })
       .finally(() => setCompareLoading(false));
-  }, [deckId, onError]);
+  }, [deckId, timePeriod, minEventSize, onError]);
 
-  const loadStock = useCallback((id: number, n: number) => {
+  const loadStock = useCallback((id: number, n: number, period: string, size: number) => {
     setStockLoading(true);
     setStockError('');
     setStock(null);
-    api.getMetaStock(id, n)
+    api.getMetaStock(id, n, period, size)
       .then(setStock)
       .catch(e => { setStockError(errText(e)); onError(errText(e)); })
       .finally(() => setStockLoading(false));
@@ -287,20 +300,21 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
 
   useEffect(() => {
     if (view !== 'stock' || deckId === null) return;
-    loadStock(deckId, topN);
-  }, [view, deckId, topN, loadStock]);
+    loadStock(deckId, topN, timePeriod, minEventSize);
+  }, [view, deckId, topN, timePeriod, minEventSize, loadStock]);
 
   const closeCompare = () => { setCompareEntryId(''); setCompare(null); };
 
   const selectedDeck = decks.find(d => d.id === deckId) || null;
   const entries = overview?.entries || [];
+  const periodLabel = TIME_OPTIONS.find(o => o.value === timePeriod)?.label || '3 months';
 
   return (
     <div className="page">
       <div className="section-head">
         <h2>Meta</h2>
         <span className="head-action" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-          edhtop16 · top results, last 3 months, events 16+
+          edhtop16 · top results, {periodLabel.toLowerCase()}, events {minEventSize}+
         </span>
       </div>
 
@@ -331,6 +345,26 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
               onChange={e => setTopN(Number(e.target.value))}
             >
               {[5, 10, 15, 25].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <label className="filter-label" htmlFor="meta-period-select">Time</label>
+            <select
+              id="meta-period-select"
+              className="field"
+              style={{ width: 'auto', flex: '0 1 auto' }}
+              value={timePeriod}
+              onChange={e => { closeCompare(); setTimePeriod(e.target.value); }}
+            >
+              {TIME_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <label className="filter-label" htmlFor="meta-size-select">Min size</label>
+            <select
+              id="meta-size-select"
+              className="field"
+              style={{ width: 'auto', flex: '0 1 auto' }}
+              value={minEventSize}
+              onChange={e => { closeCompare(); setMinEventSize(Number(e.target.value)); }}
+            >
+              {SIZE_OPTIONS.map(n => <option key={n} value={n}>{n}+</option>)}
             </select>
             {view === 'stock' ? (
               <button type="button" className="chip" onClick={() => setView('entries')}>

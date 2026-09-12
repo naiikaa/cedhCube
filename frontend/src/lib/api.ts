@@ -75,20 +75,24 @@ export const api = {
     }),
 
   // Meta (edhtop16)
-  getMetaForDeck: (deckId: number) =>
+  getMetaForDeck: (deckId: number, timePeriod = 'THREE_MONTHS', minEventSize = 16) =>
     request<MetaDeckOverview>('/meta/decks', {
       method: 'POST',
-      body: JSON.stringify({ deck_id: deckId }),
+      body: JSON.stringify({ deck_id: deckId, time_period: timePeriod, min_event_size: minEventSize }),
     }),
-  getMetaCompare: (deckId: number, entryId: string) =>
+  getMetaCompare: (deckId: number, entryId: string, timePeriod = 'THREE_MONTHS', minEventSize = 16) =>
     request<MetaCompareResult>('/meta/compare', {
       method: 'POST',
-      body: JSON.stringify({ deck_id: deckId, entry_id: entryId }),
+      body: JSON.stringify({
+        deck_id: deckId, entry_id: entryId, time_period: timePeriod, min_event_size: minEventSize,
+      }),
     }),
-  getMetaStock: (deckId: number, topN: number) =>
+  getMetaStock: (deckId: number, topN: number, timePeriod = 'THREE_MONTHS', minEventSize = 16) =>
     request<MetaStockResult>('/meta/stock', {
       method: 'POST',
-      body: JSON.stringify({ deck_id: deckId, top_n: topN }),
+      body: JSON.stringify({
+        deck_id: deckId, top_n: topN, time_period: timePeriod, min_event_size: minEventSize,
+      }),
     }),
 
   // Images

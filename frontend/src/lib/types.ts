@@ -84,7 +84,13 @@ export interface MetaEntry {
   tournament_size: number;
 }
 
-export interface MetaDeckOverview {
+/** Filter window the backend actually queried edhtop16 with (post-clamp). */
+export interface MetaFilters {
+  time_period: string;
+  min_event_size: number;
+}
+
+export interface MetaDeckOverview extends MetaFilters {
   commander: string;
   deck_id: number;
   entries: MetaEntry[];
@@ -127,7 +133,7 @@ export interface MetaStockCard {
   in_decks: string[];
 }
 
-export interface MetaStockResult {
+export interface MetaStockResult extends MetaFilters {
   commander: string;
   deck_id: number;
   top_n: number;
