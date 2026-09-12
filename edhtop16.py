@@ -10,6 +10,10 @@ import requests
 EDHTOP16_ENDPOINT = "https://edhtop16.com/api/graphql"
 HEADERS = {"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"}
 
+# edhtop16's `TimePeriod` GraphQL enum. Interpolated as a bare literal, so any
+# value outside this tuple is rejected and falls back to THREE_MONTHS.
+TIME_PERIODS = ("ALL_TIME", "ONE_MONTH", "ONE_YEAR", "POST_BAN", "SIX_MONTHS", "THREE_MONTHS")
+
 # Full maindecks are ~25 × 100 cards per commander query, so repeat comparisons
 # are served from a short-lived cache keyed by entry id.
 _MAINDECK_TTL = 15 * 60
@@ -57,13 +61,26 @@ def _escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _entries_query(commander_key_str: str, first: int, with_maindeck: bool) -> str:
+def clamp_filters(time_period, min_event_size) -> tuple:
+    """Coerce client-supplied filters to values edhtop16 accepts.
+
+    The enum is interpolated as a bare GraphQL literal, so it must come from the
+    whitelist — never from raw client input. Routes reuse this to echo back what
+    was actually queried."""
+    period = time_period if time_period in TIME_PERIODS else "THREE_MONTHS"
+    size = 16 if min_event_size is None else max(1, int(min_event_size))
+    return period, size
+
+
+def _entries_query(commander_key_str: str, first: int, with_maindeck: bool,
+                   time_period: str = "THREE_MONTHS", min_event_size: int = 16) -> str:
     maindeck = "maindeck { name manaCost imageUrls type }" if with_maindeck else ""
+    period, size = clamp_filters(time_period, min_event_size)
     return f"""
     query {{
       commander(name: "{_escape(commander_key_str)}") {{
         entries(first: {int(first)}, sortBy: TOP,
-                filters: {{ minEventSize: 16, timePeriod: THREE_MONTHS }}) {{
+                filters: {{ minEventSize: {size}, timePeriod: {period} }}) {{
           edges {{ node {{
             id standing wins winsBracket winsSwiss
             player {{ name }}
@@ -99,11 +116,14 @@ def _entry_summary(node: dict) -> dict:
     }
 
 
-def get_commander_entries(commander_key_str: str, first: int = 25) -> list:
+def get_commander_entries(commander_key_str: str, first: int = 25,
+                          time_period: str = "THREE_MONTHS",
+                          min_event_size: int = 16) -> list:
     """Top recent tournament entries for a commander (no decklists)."""
     if not (commander_key_str or "").strip():
         return []
-    data = _gql(_entries_query(commander_key_str, first, with_maindeck=False))
+    data = _gql(_entries_query(commander_key_str, first, with_maindeck=False,
+                               time_period=time_period, min_event_size=min_event_size))
     return [_entry_summary(n) for n in _edges(data) if n.get("id")]
 
 
@@ -122,7 +142,9 @@ def _maindeck_cards(node: dict) -> list:
     return cards
 
 
-def get_entry_maindeck(commander_key_str: str, entry_id: str, first: int = 25) -> list:
+def get_entry_maindeck(commander_key_str: str, entry_id: str, first: int = 25,
+                       time_period: str = "THREE_MONTHS",
+                       min_event_size: int = 16) -> list:
     """Full 100-card maindeck for one entry. Cached for 15 minutes."""
     cached = _maindeck_cache.get(entry_id)
     now = time.time()
@@ -132,7 +154,8 @@ def get_entry_maindeck(commander_key_str: str, entry_id: str, first: int = 25) -
     if not (commander_key_str or "").strip() or not entry_id:
         return []
 
-    data = _gql(_entries_query(commander_key_str, first, with_maindeck=True))
+    data = _gql(_entries_query(commander_key_str, first, with_maindeck=True,
+                               time_period=time_period, min_event_size=min_event_size))
     found = []
     for node in _edges(data):
         cards = _maindeck_cards(node)

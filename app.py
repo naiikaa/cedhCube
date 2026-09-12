@@ -18,7 +18,8 @@ from database import (
 )
 from scryfall import parse_card_list, validate_and_resolve_card, lookup_card, fetch_card_detail
 from moxfield import fetch_moxfield_deck, extract_deck_id, fetch_card_images_bulk
-from edhtop16 import commander_key, get_commander_entries, get_entry_maindeck
+from edhtop16 import (clamp_filters, commander_key, get_commander_entries,
+                      get_entry_maindeck)
 
 app = FastAPI(title="cEDHcube")
 
@@ -70,14 +71,20 @@ class ImportDeckRequest(BaseModel):
 
 class MetaDecksRequest(BaseModel):
     deck_id: int
+    time_period: Optional[str] = "THREE_MONTHS"
+    min_event_size: Optional[int] = 16
 
 class MetaCompareRequest(BaseModel):
     deck_id: int
     entry_id: str
+    time_period: Optional[str] = "THREE_MONTHS"
+    min_event_size: Optional[int] = 16
 
 class MetaStockRequest(BaseModel):
     deck_id: int
     top_n: int = 10
+    time_period: Optional[str] = "THREE_MONTHS"
+    min_event_size: Optional[int] = 16
 
 # ─── Commander Detection ───
 
@@ -495,15 +502,19 @@ def api_meta_decks(req: MetaDecksRequest):
     if not deck:
         return JSONResponse({"error": "Deck not found"}, status_code=404)
 
+    period, size = clamp_filters(req.time_period, req.min_event_size)
     key = _deck_commander_key(deck)
     if not key:
-        return {"commander": "", "deck_id": req.deck_id, "entries": []}
+        return {"commander": "", "deck_id": req.deck_id, "entries": [],
+                "time_period": period, "min_event_size": size}
 
     try:
-        entries = get_commander_entries(key)
+        entries = get_commander_entries(key, first=25, time_period=period,
+                                        min_event_size=size)
     except RuntimeError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
-    return {"commander": key, "deck_id": req.deck_id, "entries": entries}
+    return {"commander": key, "deck_id": req.deck_id, "entries": entries,
+            "time_period": period, "min_event_size": size}
 
 
 @app.post("/api/meta/compare")
@@ -516,9 +527,13 @@ def api_meta_compare(req: MetaCompareRequest):
     if not key:
         return JSONResponse({"error": "Deck has no commander"}, status_code=404)
 
+    # Both fetches use the same window the overview displayed, so the clicked
+    # entry is guaranteed to be in the fetched set.
+    period, size = clamp_filters(req.time_period, req.min_event_size)
     try:
-        entries = get_commander_entries(key)
-        maindeck = get_entry_maindeck(key, req.entry_id)
+        entries = get_commander_entries(key, time_period=period, min_event_size=size)
+        maindeck = get_entry_maindeck(key, req.entry_id, time_period=period,
+                                      min_event_size=size)
     except RuntimeError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
 
@@ -586,15 +601,18 @@ def api_meta_stock(req: MetaStockRequest):
         return JSONResponse({"error": "Deck has no commander"}, status_code=404)
 
     top_n = min(max(req.top_n, 1), 25)
+    period, size = clamp_filters(req.time_period, req.min_event_size)
 
     commanders = _deck_commander_norms(deck)
     analyzed, stock = [], {}
     try:
-        entries = get_commander_entries(key, first=top_n)
+        entries = get_commander_entries(key, first=top_n, time_period=period,
+                                        min_event_size=size)
         # Sequential on purpose: get_entry_maindeck caches every entry it sees for
         # 15 minutes, so the loop costs one edhtop16 round trip, not top_n bursts.
         for entry in entries[:top_n]:
-            maindeck = get_entry_maindeck(key, entry.get("id") or "")
+            maindeck = get_entry_maindeck(key, entry.get("id") or "", first=top_n,
+                                          time_period=period, min_event_size=size)
             if not maindeck:
                 continue
             analyzed.append(entry)
@@ -652,6 +670,8 @@ def api_meta_stock(req: MetaStockRequest):
         "commander": key,
         "deck_id": req.deck_id,
         "top_n": top_n,
+        "time_period": period,
+        "min_event_size": size,
         "decks_analyzed": decks_analyzed,
         "analyzed_entries": analyzed,
         "stock": cards,
