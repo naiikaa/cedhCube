@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
 import {
-  Check, CircleCheck, CircleX, Crown, ImageOff, Layers, LibraryBig, Pencil, RefreshCw, Trash2, X,
+  Check, CircleCheck, CircleX, Crown, ImageOff, Layers, LibraryBig, Pencil, RefreshCw, Swords,
+  Trash2, X,
 } from 'lucide-react';
 import { api } from './lib/api';
 import type { Deck, Card, CollectionCard, CardResult, CmcStats, CardDetail } from './lib/types';
@@ -10,11 +11,15 @@ import { FullManaCurve, MiniManaCurve } from './components/ManaCurve';
 import { Header } from './components/Header';
 import { CardImage, Spinner } from './components/UI';
 import { useToast, Toast } from './components/Toast';
+import { MetaTab } from './components/MetaTab';
 
 const TABS = [
   { value: 'decks', label: 'Decks', Icon: Layers },
   { value: 'collection', label: 'Collection', Icon: LibraryBig },
+  { value: 'meta', label: 'Meta', Icon: Swords },
 ] as const;
+
+type TabValue = (typeof TABS)[number]['value'];
 
 /** Collection type filters, each paired with its authentic MTG card-type glyph. */
 const TYPE_FILTERS: { value: string; label: string; glyph?: string }[] = [
@@ -48,8 +53,10 @@ const deckCommanders = (deck: Deck): CommanderPick[] =>
 
 // ─── App ───
 export default function App() {
-  const [tab, setTab] = useState<'decks' | 'collection'>('decks');
+  const [tab, setTab] = useState<TabValue>('decks');
   const { show, toasts, remove } = useToast();
+  // Stable identity: MetaTab keys its fetch effect off this callback.
+  const showError = useCallback((msg: string) => show(msg, 'error'), [show]);
 
   // ── Decks ──
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -129,7 +136,7 @@ export default function App() {
   const closeCardDetail = () => { setDetailCard(null); setCardDetail(null); };
 
   // ── Tab switch ──
-  const switchTab = useCallback((t: 'decks' | 'collection') => {
+  const switchTab = useCallback((t: TabValue) => {
     setTab(t);
     if (t === 'collection') loadCollection();
   }, [loadCollection]);
@@ -490,6 +497,9 @@ export default function App() {
           )}
         </div>
       )}
+
+      {/* ═══════════════════ M E T A   T A B ═══════════════════ */}
+      {tab === 'meta' && <MetaTab decks={decks} onError={showError} />}
 
       {/* ═══════════════════ D E C K   M O D A L ═══════════════════ */}
       {modalDeck && (

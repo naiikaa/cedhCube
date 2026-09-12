@@ -4,6 +4,7 @@ import threading
 import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from database import (
@@ -17,6 +18,8 @@ from database import (
 )
 from scryfall import parse_card_list, validate_and_resolve_card, lookup_card, fetch_card_detail
 from moxfield import fetch_moxfield_deck, extract_deck_id, fetch_card_images_bulk
+from edhtop16 import (clamp_filters, commander_key, get_commander_entries,
+                      get_entry_maindeck)
 
 app = FastAPI(title="cEDHcube")
 
@@ -65,6 +68,23 @@ class UpdateCardRequest(BaseModel):
 class ImportDeckRequest(BaseModel):
     url: str
     color: Optional[str] = None
+
+class MetaDecksRequest(BaseModel):
+    deck_id: int
+    time_period: Optional[str] = "THREE_MONTHS"
+    min_event_size: Optional[int] = 16
+
+class MetaCompareRequest(BaseModel):
+    deck_id: int
+    entry_id: str
+    time_period: Optional[str] = "THREE_MONTHS"
+    min_event_size: Optional[int] = 16
+
+class MetaStockRequest(BaseModel):
+    deck_id: int
+    top_n: int = 10
+    time_period: Optional[str] = "THREE_MONTHS"
+    min_event_size: Optional[int] = 16
 
 # ─── Commander Detection ───
 
@@ -443,6 +463,220 @@ def api_refresh_deck_images(deck_id: int):
 def api_refresh_all_images():
     threading.Thread(target=refresh_all_images, daemon=True).start()
     return {"ok": True}
+
+# ─── Meta (edhtop16) ───
+
+def _primary_name(name):
+    """edhtop16 lists DFCs as "Front // Back"; the app stores the front name."""
+    return (name or "").split(" // ")[0].strip()
+
+
+def _deck_commander_key(deck):
+    return commander_key(deck.get("commander_name") or "",
+                         deck.get("commander2_name") or "")
+
+
+def _norm(name):
+    """Best-effort normalised name for cross-source matching. The same card can
+    be spelled differently in our DB vs edhtop16: DFCs ('Front // Back'), sticker
+    names whose blank-underscore count varies ('________ Goblin' vs '_____ Goblin'),
+    and stray whitespace. Iron all of those out so the card matches.
+    """
+    s = _primary_name(name).lower().strip()
+    s = s.replace("_", "")          # sticker/Acorn blanks use varying underscore counts
+    return " ".join(s.split())      # collapse internal whitespace
+
+
+def _deck_commander_norms(deck):
+    """Normalised names of the deck's commander(s) — command-zone constants that
+    must never appear in a maindeck comparison (edhtop16 frequently omits the
+    commander from its maindeck dump, which would otherwise false-flag it as
+    'you play, meta doesn't')."""
+    return {_norm(deck.get(f)) for f in ("commander_name", "commander2_name")
+            if (deck.get(f) or "").strip()}
+
+
+@app.post("/api/meta/decks")
+def api_meta_decks(req: MetaDecksRequest):
+    deck = get_deck(req.deck_id)
+    if not deck:
+        return JSONResponse({"error": "Deck not found"}, status_code=404)
+
+    period, size = clamp_filters(req.time_period, req.min_event_size)
+    key = _deck_commander_key(deck)
+    if not key:
+        return {"commander": "", "deck_id": req.deck_id, "entries": [],
+                "time_period": period, "min_event_size": size}
+
+    try:
+        entries = get_commander_entries(key, first=25, time_period=period,
+                                        min_event_size=size)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    return {"commander": key, "deck_id": req.deck_id, "entries": entries,
+            "time_period": period, "min_event_size": size}
+
+
+@app.post("/api/meta/compare")
+def api_meta_compare(req: MetaCompareRequest):
+    deck = get_deck(req.deck_id)
+    if not deck:
+        return JSONResponse({"error": "Deck not found"}, status_code=404)
+
+    key = _deck_commander_key(deck)
+    if not key:
+        return JSONResponse({"error": "Deck has no commander"}, status_code=404)
+
+    # Both fetches use the same window the overview displayed, so the clicked
+    # entry is guaranteed to be in the fetched set.
+    period, size = clamp_filters(req.time_period, req.min_event_size)
+    try:
+        entries = get_commander_entries(key, time_period=period, min_event_size=size)
+        maindeck = get_entry_maindeck(key, req.entry_id, time_period=period,
+                                      min_event_size=size)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    entry = next((e for e in entries if e.get("id") == req.entry_id), None)
+    if entry is None or not maindeck:
+        return JSONResponse({"error": "Meta entry not found"}, status_code=404)
+
+    my_cards = get_deck_cards(req.deck_id) or []
+    commanders = _deck_commander_norms(deck)
+    my_by_name = {}
+    for row in my_cards:
+        norm = _norm(row.get("card_name"))
+        if norm in commanders:
+            continue  # command-zone card, not a maindeck slot
+        if norm and norm not in my_by_name:
+            my_by_name[norm] = row
+
+    overlap, missing, seen = [], [], set()
+    meta_names = set()
+    for card in maindeck:
+        norm = _norm(card.get("name"))
+        if not norm or norm in commanders:
+            continue  # constant for both decks; edhtop16 often omits it
+        meta_names.add(norm)
+        if norm in seen:
+            continue
+        seen.add(norm)
+        mine = my_by_name.get(norm)
+        entry_card = {
+            "name": card.get("name") or "",
+            "mana_cost": card.get("mana_cost") or "",
+            "image_url": card.get("image_url") or "",
+            "quantity": (mine or {}).get("quantity") or 1,
+        }
+        (overlap if mine else missing).append(entry_card)
+
+    mine_only = [
+        {
+            "name": row.get("card_name") or "",
+            "mana_cost": row.get("mana_cost") or "",
+            "image_url": row.get("image_url") or "",
+            "quantity": row.get("quantity") or 1,
+        }
+        for norm, row in my_by_name.items() if norm not in meta_names
+    ]
+
+    return {
+        "entry": entry,
+        "meta_maindeck_count": len(maindeck),
+        "overlap": overlap,
+        "missing_from_mine": missing,
+        "my_cards_not_in_meta": mine_only,
+    }
+
+
+@app.post("/api/meta/stock")
+def api_meta_stock(req: MetaStockRequest):
+    """Aggregate what the top-N meta decks for this commander collectively play."""
+    deck = get_deck(req.deck_id)
+    if not deck:
+        return JSONResponse({"error": "Deck not found"}, status_code=404)
+
+    key = _deck_commander_key(deck)
+    if not key:
+        return JSONResponse({"error": "Deck has no commander"}, status_code=404)
+
+    top_n = min(max(req.top_n, 1), 25)
+    period, size = clamp_filters(req.time_period, req.min_event_size)
+
+    commanders = _deck_commander_norms(deck)
+    analyzed, stock = [], {}
+    try:
+        entries = get_commander_entries(key, first=top_n, time_period=period,
+                                        min_event_size=size)
+        # Sequential on purpose: get_entry_maindeck caches every entry it sees for
+        # 15 minutes, so the loop costs one edhtop16 round trip, not top_n bursts.
+        for entry in entries[:top_n]:
+            maindeck = get_entry_maindeck(key, entry.get("id") or "", first=top_n,
+                                          time_period=period, min_event_size=size)
+            if not maindeck:
+                continue
+            analyzed.append(entry)
+            player = entry.get("player") or ""
+            seen = set()
+            for card in maindeck:
+                norm = _norm(card.get("name"))
+                if not norm or norm in commanders:
+                    continue  # constant for both decks; edhtop16 often omits it
+                if norm in seen:
+                    continue
+                seen.add(norm)
+                agg = stock.get(norm)
+                if agg is None:
+                    agg = stock[norm] = {
+                        "name": _primary_name(card.get("name")),
+                        "mana_cost": card.get("mana_cost") or "",
+                        "image_url": card.get("image_url") or "",
+                        "type": card.get("type") or "",
+                        "count": 0,
+                        "in_decks": [],
+                    }
+                agg["count"] += 1
+                if player:
+                    agg["in_decks"].append(player)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    decks_analyzed = len(analyzed)
+    my_by_name = {}
+    for row in get_deck_cards(req.deck_id) or []:
+        norm = _norm(row.get("card_name"))
+        if norm in commanders:
+            continue
+        if norm and norm not in my_by_name:
+            my_by_name[norm] = row
+
+    cards = []
+    for norm, agg in stock.items():
+        mine = my_by_name.get(norm)
+        cards.append({
+            "name": agg["name"],
+            "mana_cost": agg["mana_cost"],
+            "image_url": agg["image_url"],
+            "type": agg["type"],
+            "count": agg["count"],
+            "share": agg["count"] / decks_analyzed if decks_analyzed else 0.0,
+            "quantity": (mine or {}).get("quantity") or 0,
+            "in_my_deck": mine is not None,
+            "in_decks": agg["in_decks"],
+        })
+    cards.sort(key=lambda c: (-c["count"], c["name"].lower()))
+
+    return {
+        "commander": key,
+        "deck_id": req.deck_id,
+        "top_n": top_n,
+        "time_period": period,
+        "min_event_size": size,
+        "decks_analyzed": decks_analyzed,
+        "analyzed_entries": analyzed,
+        "stock": cards,
+        "missed_count": sum(1 for c in cards if not c["in_my_deck"]),
+    }
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+import type { MetaCompareResult, MetaDeckOverview, MetaStockResult } from './types';
+
 const BASE = '/api';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -70,6 +72,27 @@ export const api = {
     request<{ id: number; name: string; results: import('./types').CardResult[] }>('/decks/import', {
       method: 'POST',
       body: JSON.stringify({ url, color }),
+    }),
+
+  // Meta (edhtop16)
+  getMetaForDeck: (deckId: number, timePeriod = 'THREE_MONTHS', minEventSize = 16) =>
+    request<MetaDeckOverview>('/meta/decks', {
+      method: 'POST',
+      body: JSON.stringify({ deck_id: deckId, time_period: timePeriod, min_event_size: minEventSize }),
+    }),
+  getMetaCompare: (deckId: number, entryId: string, timePeriod = 'THREE_MONTHS', minEventSize = 16) =>
+    request<MetaCompareResult>('/meta/compare', {
+      method: 'POST',
+      body: JSON.stringify({
+        deck_id: deckId, entry_id: entryId, time_period: timePeriod, min_event_size: minEventSize,
+      }),
+    }),
+  getMetaStock: (deckId: number, topN: number, timePeriod = 'THREE_MONTHS', minEventSize = 16) =>
+    request<MetaStockResult>('/meta/stock', {
+      method: 'POST',
+      body: JSON.stringify({
+        deck_id: deckId, top_n: topN, time_period: timePeriod, min_event_size: minEventSize,
+      }),
     }),
 
   // Images

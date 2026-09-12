@@ -72,6 +72,77 @@ export interface CardResult {
   image_url?: string;
 }
 
+export interface MetaEntry {
+  id: string;
+  standing: number | null;
+  wins: number;
+  wins_bracket: number;
+  wins_swiss: number;
+  player: string;
+  tournament_name: string;
+  tournament_date: string;
+  tournament_size: number;
+}
+
+/** Filter window the backend actually queried edhtop16 with (post-clamp). */
+export interface MetaFilters {
+  time_period: string;
+  min_event_size: number;
+}
+
+export interface MetaDeckOverview extends MetaFilters {
+  commander: string;
+  deck_id: number;
+  entries: MetaEntry[];
+}
+
+export interface MetaCompareCard {
+  name: string;
+  mana_cost: string;
+  image_url: string;
+  quantity: number;
+}
+
+export interface MetaCompareResult {
+  entry: MetaEntry;
+  meta_maindeck_count: number;
+  overlap: MetaCompareCard[];
+  missing_from_mine: MetaCompareCard[];
+  my_cards_not_in_meta: MetaCompareCard[];
+}
+
+export interface MetaStockEntryRef {
+  id: string;
+  standing: number | null;
+  wins: number;
+  player: string;
+  tournament_name: string;
+  tournament_date: string;
+  tournament_size: number;
+}
+
+export interface MetaStockCard {
+  name: string;
+  mana_cost: string;
+  image_url: string;
+  type: string;
+  count: number;
+  share: number;
+  quantity: number;
+  in_my_deck: boolean;
+  in_decks: string[];
+}
+
+export interface MetaStockResult extends MetaFilters {
+  commander: string;
+  deck_id: number;
+  top_n: number;
+  decks_analyzed: number;
+  analyzed_entries: MetaStockEntryRef[];
+  stock: MetaStockCard[];
+  missed_count: number;
+}
+
 export interface ApiError {
   error: string;
 }
