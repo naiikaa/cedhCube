@@ -591,7 +591,7 @@ export default function App() {
                 <div key={c.id} className="card-row">
                   <CardImage url={c.image_url} name={c.card_name} size={28} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.78rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.card_name}</div>
+                    <div className="card-row-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.card_name}</div>
                     <ManaCost cost={c.mana_cost} />
                   </div>
                   <button type="button" className={`foil-badge${c.is_foil ? '' : ' off'}`}

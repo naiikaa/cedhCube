@@ -88,7 +88,8 @@ export function Header({ deckCount, uniqueCards, totalCards, onSearch }: HeaderP
       </div>
 
       <div className="header-brand">
-        <h1 className="wordmark">c<b>EDH</b>cube</h1>
+        {/* data-text feeds the cybercore theme's RGB-split glitch pseudo-elements. */}
+        <h1 className="wordmark" data-text="cEDHcube">c<b>EDH</b>cube</h1>
         <span className="brand-pips" aria-hidden="true">
           {BRAND_PIPS.map(c => <ManaPip key={c} symbol={c} />)}
         </span>
