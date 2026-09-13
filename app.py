@@ -15,9 +15,12 @@ from database import (
     get_cards_missing_images, update_card_image,
     get_decks_missing_commander_images, update_deck_commander_image,
     get_deck_cmc_distribution,
+    save_prices, get_price_summary, get_collection_history, get_card_history,
 )
-from scryfall import parse_card_list, validate_and_resolve_card, lookup_card, fetch_card_detail
-from moxfield import fetch_moxfield_deck, extract_deck_id, fetch_card_images_bulk
+from scryfall import (parse_card_list, validate_and_resolve_card, lookup_card,
+                      fetch_card_detail, fetch_card_images_bulk, fetch_cards_bulk)
+from moxfield import fetch_moxfield_deck, extract_deck_id
+from prices import refresh_prices_async, start_price_daemon
 from edhtop16 import (clamp_filters, commander_key, get_commander_entries,
                       get_entry_maindeck)
 
@@ -181,7 +184,12 @@ def refresh_all_images():
 
 def _fetch_and_save_images(deck_id, scryfall_ids, cmd_name, cmd_sf_id,
                            cmd2_name=None, cmd2_sf_id=None):
-    id_to_url = fetch_card_images_bulk(scryfall_ids)
+    """Post-import backfill: Moxfield gives us neither images nor prices, so one
+    bulk Scryfall pass fills both."""
+    cards = fetch_cards_bulk(scryfall_ids)
+    id_to_url = {sid: c["image_url"] for sid, c in cards.items() if c["image_url"]}
+    save_prices({sid: (c["price_eur"], c["price_eur_foil"]) for sid, c in cards.items()},
+                snapshot=False)
     card_rows = get_deck_cards(deck_id)
     scryfall_to_db_id = {c["scryfall_id"]: c["id"] for c in card_rows if c.get("scryfall_id")}
     for scryfall_id, image_url in id_to_url.items():
@@ -199,6 +207,7 @@ def _fetch_and_save_images(deck_id, scryfall_ids, cmd_name, cmd_sf_id,
 @app.on_event("startup")
 def startup():
     init_db()
+    start_price_daemon()
 
 # ─── Deck Routes ───
 
@@ -232,6 +241,8 @@ def api_add_deck(req: CreateDeckRequest):
                     image_url=resolved["image_url"], mana_cost=resolved.get("mana_cost", ""),
                     colors=resolved.get("colors", []), color_identity=resolved.get("color_identity", []),
                     cmc=resolved.get("cmc", 0), type_line=resolved.get("type_line", ""),
+                    price_eur=resolved.get("price_eur"),
+                    price_eur_foil=resolved.get("price_eur_foil"),
                 )
                 resolved_cards.append(resolved)
                 results.append({"status": "ok", "requested": card_name, "resolved": resolved["name"], "quantity": quantity, "image_url": resolved["image_url"]})
@@ -368,6 +379,8 @@ def api_add_cards(deck_id: int, req: AddCardsRequest):
                 image_url=resolved["image_url"], mana_cost=resolved.get("mana_cost", ""),
                 colors=resolved.get("colors", []), color_identity=resolved.get("color_identity", []),
                 cmc=resolved.get("cmc", 0), type_line=resolved.get("type_line", ""),
+                price_eur=resolved.get("price_eur"),
+                price_eur_foil=resolved.get("price_eur_foil"),
             )
             results.append({"status": "ok", "requested": card_name, "resolved": resolved["name"], "quantity": quantity, "image_url": resolved["image_url"]})
         else:
@@ -429,7 +442,31 @@ def api_card_details(scryfall_id: str = "", card_name: str = ""):
     detail = fetch_card_detail(scryfall_id)
     if not detail:
         raise HTTPException(404, "Could not find card on Scryfall")
+    # Opening a card is one more fetch path that already carries prices: keep
+    # the stored row fresh, but leave the daily history point alone.
+    save_prices({scryfall_id: (detail["price_eur"], detail["price_eur_foil"])}, snapshot=False)
     return detail
+
+# ─── Prices ───
+
+@app.get("/api/prices/summary")
+def api_price_summary():
+    return get_price_summary()
+
+@app.get("/api/prices/history")
+def api_price_history(scope: str = "collection", window: str = "90D", scryfall_id: str = ""):
+    if scope == "card":
+        if not scryfall_id:
+            raise HTTPException(400, "scryfall_id required for scope=card")
+        return get_card_history(scryfall_id, window)
+    if scope != "collection":
+        raise HTTPException(400, "scope must be 'collection' or 'card'")
+    return get_collection_history(window)
+
+@app.post("/api/refresh-prices")
+def api_refresh_prices():
+    refresh_prices_async()
+    return {"ok": True}
 
 # ─── Image Refresh ───
 

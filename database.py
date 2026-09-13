@@ -61,11 +61,23 @@ def init_db():
             cmc REAL DEFAULT 0,
             type_line TEXT DEFAULT '',
             is_foil INTEGER DEFAULT 0,
+            price_eur REAL,
+            price_eur_foil REAL,
             FOREIGN KEY (deck_id) REFERENCES decks(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS price_history (
+            scryfall_id TEXT NOT NULL,
+            snapshot_ts TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            eur REAL,
+            eur_foil REAL,
+            PRIMARY KEY (scryfall_id, snapshot_ts)
         );
 
         CREATE INDEX IF NOT EXISTS idx_deck_cards_deck_id ON deck_cards(deck_id);
         CREATE INDEX IF NOT EXISTS idx_deck_cards_name ON deck_cards(card_name);
+        CREATE INDEX IF NOT EXISTS idx_deck_cards_scryfall_id ON deck_cards(scryfall_id);
+        CREATE INDEX IF NOT EXISTS idx_price_history_ts ON price_history(snapshot_ts);
     """)
     # Migrate existing DB: add columns if they don't exist
     cols = [row[1] for row in conn.execute("PRAGMA table_info(decks)").fetchall()]
@@ -80,6 +92,10 @@ def init_db():
     card_cols = [row[1] for row in conn.execute("PRAGMA table_info(deck_cards)").fetchall()]
     if 'is_foil' not in card_cols:
         conn.execute("ALTER TABLE deck_cards ADD COLUMN is_foil INTEGER DEFAULT 0")
+    if 'price_eur' not in card_cols:
+        conn.execute("ALTER TABLE deck_cards ADD COLUMN price_eur REAL")
+    if 'price_eur_foil' not in card_cols:
+        conn.execute("ALTER TABLE deck_cards ADD COLUMN price_eur_foil REAL")
     conn.commit()
     conn.close()
 
@@ -318,21 +334,24 @@ def get_deck_cmc_distribution(deck_id):
 
 def add_card_to_deck(deck_id, card_name, quantity=1, set_code=None, scryfall_id=None,
                      image_url=None, mana_cost=None, colors=None, color_identity=None,
-                     cmc=None, type_line=None, is_foil=0):
+                     cmc=None, type_line=None, is_foil=0,
+                     price_eur=None, price_eur_foil=None):
     conn = get_db()
     try:
         import json
         conn.execute("""
             INSERT INTO deck_cards (deck_id, card_name, quantity, set_code, scryfall_id,
-                                    image_url, mana_cost, colors, color_identity, cmc, type_line, is_foil)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    image_url, mana_cost, colors, color_identity, cmc, type_line,
+                                    is_foil, price_eur, price_eur_foil)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (deck_id, card_name, quantity, set_code, scryfall_id, image_url,
               mana_cost or "",
               json.dumps(colors or []),
               json.dumps(color_identity or []),
               cmc or 0,
               type_line or "",
-              is_foil or 0))
+              is_foil or 0,
+              price_eur, price_eur_foil))
         conn.commit()
     finally:
         conn.close()
@@ -423,7 +442,12 @@ def get_collection():
                    colors, color_identity, cmc,
                    SUM(quantity) as total_quantity,
                    COUNT(DISTINCT deck_id) as deck_count,
-                   MAX(is_foil) as is_foil
+                   MAX(is_foil) as is_foil,
+                   -- Representative unit prices for the grid. The grid shows a unit price only;
+                   -- every total is computed per row elsewhere (see collection_value()), because
+                   -- this grouping collapses foil and non-foil copies into one entry.
+                   MAX(price_eur) as price_eur,
+                   MAX(price_eur_foil) as price_eur_foil
             FROM deck_cards
             GROUP BY card_name
             ORDER BY card_name
@@ -460,5 +484,227 @@ def get_deck_color_identity(deck_id):
             ci = json.loads(row["color_identity"]) if row["color_identity"] else []
             all_colors.update(ci)
         return sorted(all_colors)
+    finally:
+        conn.close()
+
+
+# --- Price operations ---
+
+# A row is worth `quantity ×` this: the price matching its foil flag, with the
+# other finish as a fallback so a printing that only lists one of the two still
+# counts. Rows with neither price contribute nothing (NULL is skipped by SUM).
+_ROW_UNIT = """CASE WHEN dc.is_foil = 1
+                    THEN COALESCE({foil}, {norm})
+                    ELSE COALESCE({norm}, {foil}) END"""
+_CURRENT_UNIT = _ROW_UNIT.format(foil="dc.price_eur_foil", norm="dc.price_eur")
+_SNAPSHOT_UNIT = _ROW_UNIT.format(foil="px.eur_foil", norm="px.eur")
+
+# Latest snapshot per (scryfall_id, day) — a mid-day manual refresh refines that
+# day's point instead of adding a second one.
+_DAILY_PRICES = """
+    WITH daily AS (
+        SELECT scryfall_id, date(snapshot_ts) AS day, MAX(snapshot_ts) AS ts
+        FROM price_history
+        WHERE date(snapshot_ts) >= ?
+        GROUP BY scryfall_id, day
+    ),
+    px AS (
+        SELECT d.day, d.scryfall_id, ph.eur, ph.eur_foil
+        FROM daily d
+        JOIN price_history ph
+          ON ph.scryfall_id = d.scryfall_id AND ph.snapshot_ts = d.ts
+    )
+"""
+
+WINDOW_DAYS = {"30D": 30, "90D": 90, "1Y": 365}
+
+
+def window_cutoff(window):
+    """Window label → inclusive `YYYY-MM-DD` lower bound ('ALL' → the epoch)."""
+    days = WINDOW_DAYS.get((window or "").upper())
+    if days is None:
+        return "0001-01-01"
+    conn = get_db()
+    try:
+        return conn.execute("SELECT date('now', ?)", (f"-{days} day",)).fetchone()[0]
+    finally:
+        conn.close()
+
+
+def get_collection_scryfall_ids():
+    """Every distinct Scryfall id owned, for the bulk price refresh."""
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT DISTINCT scryfall_id FROM deck_cards
+            WHERE scryfall_id IS NOT NULL AND scryfall_id != ''
+        """).fetchall()
+        return [r["scryfall_id"] for r in rows]
+    finally:
+        conn.close()
+
+
+def save_prices(prices, snapshot=True):
+    """Write {scryfall_id: (eur, eur_foil)} onto the card rows and, by default,
+    append today's history point. Ids absent from `prices` keep their cached
+    values — a throttled or failed batch never blanks a known price.
+
+    Returns the number of distinct printings written.
+    """
+    if not prices:
+        return 0
+    conn = get_db()
+    try:
+        for sid, (eur, eur_foil) in prices.items():
+            conn.execute(
+                "UPDATE deck_cards SET price_eur = ?, price_eur_foil = ? WHERE scryfall_id = ?",
+                (eur, eur_foil, sid))
+            if snapshot:
+                conn.execute(
+                    "DELETE FROM price_history WHERE scryfall_id = ? AND date(snapshot_ts) = date('now')",
+                    (sid,))
+                conn.execute("""
+                    INSERT INTO price_history (scryfall_id, snapshot_ts, eur, eur_foil)
+                    VALUES (?, datetime('now'), ?, ?)
+                """, (sid, eur, eur_foil))
+        conn.commit()
+        return len(prices)
+    finally:
+        conn.close()
+
+
+def get_last_snapshot():
+    """ISO timestamp of the most recent price snapshot, or None."""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT MAX(snapshot_ts) AS ts FROM price_history").fetchone()
+        return row["ts"] if row and row["ts"] else None
+    finally:
+        conn.close()
+
+
+def _deck_values_now(conn):
+    rows = conn.execute(f"""
+        SELECT dc.deck_id AS deck_id, SUM(dc.quantity * ({_CURRENT_UNIT})) AS value
+        FROM deck_cards dc GROUP BY dc.deck_id
+    """).fetchall()
+    return {r["deck_id"]: r["value"] or 0.0 for r in rows}
+
+
+def _deck_values_on(conn, day):
+    """Current card rows valued at the prices recorded on `day`.
+
+    Quantity history is not stored, so this answers "what would today's
+    collection have been worth then", which is what the value chart plots.
+    """
+    rows = conn.execute(f"""
+        {_DAILY_PRICES}
+        SELECT dc.deck_id AS deck_id, SUM(dc.quantity * ({_SNAPSHOT_UNIT})) AS value
+        FROM deck_cards dc
+        JOIN px ON px.scryfall_id = dc.scryfall_id
+        WHERE px.day = ?
+        GROUP BY dc.deck_id
+    """, (day, day)).fetchall()
+    return {r["deck_id"]: r["value"] or 0.0 for r in rows}
+
+
+def get_price_summary(delta_days=30):
+    """Collection total, coverage, and per-deck value + N-day percentage delta."""
+    conn = get_db()
+    try:
+        decks = conn.execute("SELECT id, name, color FROM decks ORDER BY created_at DESC").fetchall()
+        now = _deck_values_now(conn)
+
+        coverage = conn.execute(f"""
+            SELECT COALESCE(SUM(CASE WHEN ({_CURRENT_UNIT}) IS NULL THEN 0 ELSE 1 END), 0) AS priced,
+                   COALESCE(SUM(CASE WHEN ({_CURRENT_UNIT}) IS NULL THEN 1 ELSE 0 END), 0) AS unpriced
+            FROM deck_cards dc
+        """).fetchone()
+
+        # Closest snapshot day at least `delta_days` old; without one there is
+        # no honest delta to show.
+        base_row = conn.execute("""
+            SELECT MAX(date(snapshot_ts)) AS day FROM price_history
+            WHERE date(snapshot_ts) <= date('now', ?)
+        """, (f"-{delta_days} day",)).fetchone()
+        base_day = base_row["day"] if base_row else None
+        then = _deck_values_on(conn, base_day) if base_day else {}
+
+        def delta(deck_id):
+            before = then.get(deck_id)
+            if not before:
+                return None
+            return round((now.get(deck_id, 0.0) - before) / before * 100, 2)
+
+        deck_rows = [{
+            "id": d["id"], "name": d["name"], "color": d["color"],
+            "value": round(now.get(d["id"], 0.0), 2),
+            "delta_30d": delta(d["id"]),
+        } for d in decks]
+
+        total = round(sum(now.values()), 2)
+        total_then = sum(then.values()) if then else 0.0
+        return {
+            "currency": "EUR",
+            "total": total,
+            "delta_30d": round((total - total_then) / total_then * 100, 2) if total_then else None,
+            "priced_rows": coverage["priced"],
+            "unpriced_rows": coverage["unpriced"],
+            "last_snapshot": get_last_snapshot(),
+            "decks": deck_rows,
+        }
+    finally:
+        conn.close()
+
+
+def get_collection_history(window="90D"):
+    """One point per snapshot day: collection total plus each deck's value."""
+    cutoff = window_cutoff(window)
+    conn = get_db()
+    try:
+        rows = conn.execute(f"""
+            {_DAILY_PRICES}
+            SELECT px.day AS day, dc.deck_id AS deck_id,
+                   SUM(dc.quantity * ({_SNAPSHOT_UNIT})) AS value
+            FROM deck_cards dc
+            JOIN px ON px.scryfall_id = dc.scryfall_id
+            GROUP BY px.day, dc.deck_id
+            ORDER BY px.day
+        """, (cutoff,)).fetchall()
+
+        points = {}
+        for r in rows:
+            point = points.setdefault(r["day"], {"date": r["day"], "total": 0.0, "decks": {}})
+            value = round(r["value"] or 0.0, 2)
+            point["decks"][str(r["deck_id"])] = value
+            point["total"] = round(point["total"] + value, 2)
+
+        decks = conn.execute("SELECT id, name, color FROM decks ORDER BY created_at DESC").fetchall()
+        return {
+            "currency": "EUR",
+            "window": (window or "90D").upper(),
+            "points": [points[d] for d in sorted(points)],
+            "decks": [{"id": d["id"], "name": d["name"], "color": d["color"]} for d in decks],
+        }
+    finally:
+        conn.close()
+
+
+def get_card_history(scryfall_id, window="90D"):
+    """One point per snapshot day for a single printing."""
+    cutoff = window_cutoff(window)
+    conn = get_db()
+    try:
+        rows = conn.execute(f"""
+            {_DAILY_PRICES}
+            SELECT px.day AS day, px.eur AS eur, px.eur_foil AS eur_foil
+            FROM px WHERE px.scryfall_id = ? ORDER BY px.day
+        """, (cutoff, scryfall_id)).fetchall()
+        return {
+            "currency": "EUR",
+            "window": (window or "90D").upper(),
+            "scryfall_id": scryfall_id,
+            "points": [{"date": r["day"], "eur": r["eur"], "eur_foil": r["eur_foil"]} for r in rows],
+        }
     finally:
         conn.close()

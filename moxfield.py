@@ -1,10 +1,6 @@
 """Moxfield API helpers for deck import."""
 import re
-import time
-import requests
 import cloudscraper
-
-from scryfall import get_image_url
 
 MOXFIELD_API = "https://api.moxfield.com/v2/decks/all/"
 MOXFIELD_URL_RE = re.compile(r"https?://(?:www\.)?moxfield\.com/decks/([a-zA-Z0-9_-]+)")
@@ -136,36 +132,7 @@ def _get_card_image_url(card):
     return imgs.get("normal", imgs.get("small", ""))
 
 
-SCRYFALL_COLLECTION = "https://api.scryfall.com/cards/collection"
-
-
-def fetch_card_images_bulk(scryfall_ids):
-    """Fetch image URLs for multiple cards from Scryfall by their scryfall IDs.
-
-    Returns a dict mapping {scryfall_id: image_url}.
-    Handles bulk requests in batches of 75 (Scryfall limit).
-    """
-    result = {}
-    # Filter out empty IDs
-    ids = [sid for sid in scryfall_ids if sid]
-    # Deduplicate
-    ids = list(set(ids))
-
-    for i in range(0, len(ids), 75):
-        batch = ids[i:i+75]
-        payload = {"identifiers": [{"id": sid} for sid in batch]}
-        try:
-            resp = requests.post(SCRYFALL_COLLECTION, json=payload, headers=HEADERS, timeout=30)
-            if resp.status_code == 200:
-                data = resp.json()
-                for card in data.get("data", []):
-                    img_url = get_image_url(card)
-                    if img_url:
-                        result[card["id"]] = img_url
-        except Exception:
-            pass
-        # Be nice to the API
-        if i + 75 < len(ids):
-            time.sleep(0.1)
-
-    return result
+# Bulk card data (images + prices) lives in the Scryfall client — see
+# scryfall.fetch_cards_bulk / fetch_card_images_bulk. Moxfield card objects
+# carry no prices and no usable image URLs, so every import resolves them
+# there.

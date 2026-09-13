@@ -5,8 +5,21 @@ import re
 
 SCRYFALL_SEARCH = "https://api.scryfall.com/cards/named"
 SCRYFALL_CARD = "https://api.scryfall.com/cards/"
-HEADERS = {"User-Agent": "cEDHcube/1.0 (personal project)"}
 SCRYFALL_CARD_SEARCH = "https://api.scryfall.com/cards/search"
+SCRYFALL_COLLECTION = "https://api.scryfall.com/cards/collection"
+# Scryfall asks every client for both headers; without Accept it may answer
+# with a non-JSON representation.
+HEADERS = {
+    "User-Agent": "cEDHcube/1.0 (personal project)",
+    "Accept": "application/json",
+}
+
+# /cards/collection is capped around 2 requests/second. Interactive one-card
+# lookups keep a courtesy delay; the collection-wide price snapshot walks
+# hundreds of cards and sleeps a full beat between batches.
+INTERACTIVE_DELAY = 0.1
+BULK_DELAY = 0.5
+RATE_LIMIT_BACKOFF = 30
 
 
 def lookup_card(name, set_code=None):
@@ -30,6 +43,7 @@ def lookup_card(name, set_code=None):
                 "color_identity": data.get("color_identity", []),
                 "cmc": data.get("converted_mana_cost", 0),
                 "oracle_text": get_oracle_text(data),
+                **get_prices(data),
             }
         elif resp.status_code == 404:
             return None
@@ -49,6 +63,26 @@ def get_image_url(data):
     if "image_uris" in data:
         return data["image_uris"].get("normal", data["image_uris"].get("small", ""))
     return ""
+
+
+def _eur(value):
+    """Scryfall prices arrive as decimal strings or null. "0.00" is a price."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_prices(data):
+    """EUR paper prices of a Scryfall card object.
+
+    Both finishes are returned raw regardless of what the owner holds; the
+    stored `is_foil` flag decides which one is displayed and summed.
+    """
+    prices = data.get("prices") or {}
+    return {"price_eur": _eur(prices.get("eur")), "price_eur_foil": _eur(prices.get("eur_foil"))}
 
 
 def get_oracle_text(data):
@@ -104,12 +138,60 @@ def parse_card_list(text):
 def validate_and_resolve_card(name, set_code=None):
     """Look up a card. Returns resolved card info dict or None if not found."""
     # Be nice to the API - small delay
-    time.sleep(0.1)
+    time.sleep(INTERACTIVE_DELAY)
     return lookup_card(name, set_code)
-def fetch_card_detail(scryfall_id):
-    """Fetch localized names, full oracle text, and rulings for a card.
 
-    Returns dict {name_en, name_de, name_ja, oracle_text, rulings} or None.
+
+def fetch_cards_bulk(scryfall_ids, delay=BULK_DELAY, on_batch_error=None):
+    """Fetch card data for many printings through /cards/collection.
+
+    The single seam for bulk card data: returns
+    {scryfall_id: {"image_url", "price_eur", "price_eur_foil"}} in batches of 75
+    (Scryfall's limit). A batch that 429s is retried once after a backoff; a
+    batch that still fails is skipped, so callers never see a card mapped to
+    empty data and can leave whatever they cached in place.
+    """
+    result = {}
+    ids = list({sid for sid in scryfall_ids if sid})
+
+    for i in range(0, len(ids), 75):
+        batch = ids[i:i + 75]
+        payload = {"identifiers": [{"id": sid} for sid in batch]}
+        for attempt in (0, 1):
+            try:
+                resp = requests.post(SCRYFALL_COLLECTION, json=payload, headers=HEADERS, timeout=30)
+                if resp.status_code == 429 and attempt == 0:
+                    time.sleep(RATE_LIMIT_BACKOFF)
+                    continue
+                if resp.status_code != 200:
+                    if on_batch_error:
+                        on_batch_error(resp.status_code)
+                    break
+                for card in resp.json().get("data", []):
+                    result[card["id"]] = {"image_url": get_image_url(card), **get_prices(card)}
+            except Exception:
+                if on_batch_error:
+                    on_batch_error(None)
+            break
+        if i + 75 < len(ids):
+            time.sleep(delay)
+
+    return result
+
+
+def fetch_card_images_bulk(scryfall_ids):
+    """{scryfall_id: image_url} for cards that have one — a projection of
+    fetch_cards_bulk kept for the image-refresh paths."""
+    return {sid: card["image_url"]
+            for sid, card in fetch_cards_bulk(scryfall_ids, delay=INTERACTIVE_DELAY).items()
+            if card["image_url"]}
+
+
+def fetch_card_detail(scryfall_id):
+    """Fetch localized names, full oracle text, rulings and prices for a card.
+
+    Returns dict {name_en, name_de, name_ja, oracle_text, rulings,
+    price_eur, price_eur_foil} or None.
     """
     try:
         resp = requests.get(SCRYFALL_CARD + scryfall_id, headers=HEADERS, timeout=10)
@@ -176,4 +258,5 @@ def fetch_card_detail(scryfall_id):
         "name_ja": name_ja,
         "oracle_text": oracle_text,
         "rulings": rulings,
+        **get_prices(card),
     }
