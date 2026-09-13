@@ -13,7 +13,7 @@ import { fmtEur, fmtEurCompact } from './Price';
 const WINDOWS: PriceWindow[] = ['30D', '90D', '1Y', 'ALL'];
 
 /** Deck lines cycle ice → violet → teal, matching the approved prototype. */
-const DECK_LINE_COLORS = ['var(--accent)', 'var(--accent-alt)', 'var(--success)', 'var(--commander)'];
+const DECK_LINE_COLORS = ['var(--accent)', 'var(--accent-alt)', 'var(--success)', 'var(--chrome, var(--text-dim))'];
 
 const VIEW_W = 1000;
 const VIEW_H = 240;
@@ -44,29 +44,33 @@ function xAt(index: number, count: number) {
   return count < 2 ? VIEW_W / 2 : (index / (count - 1)) * VIEW_W;
 }
 
-function yAt(value: number, max: number) {
+/** Value scale: `[0, max]` for the axed panel, tight `[min, max]` for a sparkline. */
+interface Scale { min: number; max: number }
+
+function yAt(value: number, scale: Scale) {
   const usable = VIEW_H - PAD_TOP - PAD_BOTTOM;
-  return VIEW_H - PAD_BOTTOM - (max <= 0 ? 0 : (value / max) * usable);
+  const span = scale.max - scale.min;
+  return VIEW_H - PAD_BOTTOM - (span <= 0 ? usable / 2 : ((value - scale.min) / span) * usable);
 }
 
-function linePath(values: (number | null)[], max: number) {
+function linePath(values: (number | null)[], scale: Scale) {
   let path = '';
   let pen = 'M';
   values.forEach((v, i) => {
     if (v === null) { pen = 'M'; return; }
-    path += `${pen}${xAt(i, values.length).toFixed(2)} ${yAt(v, max).toFixed(2)} `;
+    path += `${pen}${xAt(i, values.length).toFixed(2)} ${yAt(v, scale).toFixed(2)} `;
     pen = 'L';
   });
   return path.trim();
 }
 
-function areaPath(values: (number | null)[], max: number) {
+function areaPath(values: (number | null)[], scale: Scale) {
   const drawn = values.map((v, i) => ({ v, i })).filter(p => p.v !== null);
   if (drawn.length < 2) return '';
   const base = VIEW_H - PAD_BOTTOM;
   const head = `M${xAt(drawn[0].i, values.length).toFixed(2)} ${base}`;
   const body = drawn
-    .map(p => `L${xAt(p.i, values.length).toFixed(2)} ${yAt(p.v as number, max).toFixed(2)}`)
+    .map(p => `L${xAt(p.i, values.length).toFixed(2)} ${yAt(p.v as number, scale).toFixed(2)}`)
     .join(' ');
   const tail = `L${xAt(drawn[drawn.length - 1].i, values.length).toFixed(2)} ${base} Z`;
   return `${head} ${body} ${tail}`;
@@ -85,15 +89,24 @@ interface ChartProps {
 function Chart({ labels, series, height = 240, bare = false, gradientId }: ChartProps) {
   const [hover, setHover] = useState<number | null>(null);
 
-  const max = useMemo(() => {
-    const peak = Math.max(0, ...series.flatMap(s => s.values.filter((v): v is number => v !== null)));
-    // Round the ceiling up so gridline labels land on readable numbers.
-    if (peak <= 0) return 1;
+  const scale = useMemo<Scale>(() => {
+    const points = series.flatMap(s => s.values.filter((v): v is number => v !== null));
+    const peak = Math.max(0, ...points);
+    if (bare) {
+      // Sparkline: a tight window around the data, so a 2% move is visible.
+      const low = Math.min(...points);
+      const pad = (peak - low) * 0.15 || Math.max(peak * 0.05, 0.01);
+      return { min: low - pad, max: peak + pad };
+    }
+    // Axed panel: zero-based, ceiling rounded so gridline labels read cleanly.
+    if (peak <= 0) return { min: 0, max: 1 };
     const step = 10 ** Math.floor(Math.log10(peak));
-    return Math.ceil(peak / step) * step;
-  }, [series]);
+    return { min: 0, max: Math.ceil(peak / step) * step };
+  }, [series, bare]);
 
-  const gridValues = bare ? [] : Array.from({ length: GRID_LINES }, (_, i) => (max / GRID_LINES) * (i + 1));
+  const gridValues = bare
+    ? []
+    : Array.from({ length: GRID_LINES }, (_, i) => (scale.max / GRID_LINES) * (i + 1));
   const hoverIndex = hover !== null && hover >= 0 && hover < labels.length ? hover : null;
 
   const onMove = (e: MouseEvent<SVGSVGElement>) => {
@@ -114,20 +127,20 @@ function Chart({ labels, series, height = 240, bare = false, gradientId }: Chart
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--money)" stopOpacity="0.28" />
+            <stop offset="0%" stopColor="var(--money)" stopOpacity="0.16" />
             <stop offset="100%" stopColor="var(--money)" stopOpacity="0" />
           </linearGradient>
         </defs>
 
         {gridValues.map(v => (
           <line key={v} className="chart-grid"
-            x1="0" x2={VIEW_W} y1={yAt(v, max)} y2={yAt(v, max)} vectorEffect="non-scaling-stroke" />
+            x1="0" x2={VIEW_W} y1={yAt(v, scale)} y2={yAt(v, scale)} vectorEffect="non-scaling-stroke" />
         ))}
 
         {series.map(s => (
           <g key={s.key}>
-            {s.area && <path d={areaPath(s.values, max)} fill={`url(#${gradientId})`} />}
-            <path className="chart-line" d={linePath(s.values, max)} stroke={s.color}
+            {s.area && <path d={areaPath(s.values, scale)} fill={`url(#${gradientId})`} />}
+            <path className="chart-line" d={linePath(s.values, scale)} stroke={s.color}
               vectorEffect="non-scaling-stroke" />
           </g>
         ))}
@@ -140,7 +153,7 @@ function Chart({ labels, series, height = 240, bare = false, gradientId }: Chart
               const v = s.values[hoverIndex];
               return v === null || v === undefined ? null : (
                 <circle key={s.key} className="chart-dot" cx={xAt(hoverIndex, labels.length)}
-                  cy={yAt(v, max)} r="4" fill={s.color} vectorEffect="non-scaling-stroke" />
+                  cy={yAt(v, scale)} r="4" fill={s.color} vectorEffect="non-scaling-stroke" />
               );
             })}
           </>
@@ -148,7 +161,7 @@ function Chart({ labels, series, height = 240, bare = false, gradientId }: Chart
       </svg>
 
       {!bare && gridValues.map(v => (
-        <span key={v} className="chart-tick" style={{ top: `${(yAt(v, max) / VIEW_H) * 100}%` }}>
+        <span key={v} className="chart-tick" style={{ top: `${(yAt(v, scale) / VIEW_H) * 100}%` }}>
           {fmtEurCompact(v)}
         </span>
       ))}

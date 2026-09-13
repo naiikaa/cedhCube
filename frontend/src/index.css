@@ -453,6 +453,9 @@ h1, h2, h3, .display {
   position: absolute;
   right: 2px;
   transform: translateY(-100%);
+  padding: 0 3px;
+  /* Ticks sit over the plot area; a matching plate keeps them readable. */
+  background: var(--bg-surface);
   font-size: 0.6rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
