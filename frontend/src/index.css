@@ -131,6 +131,41 @@
   --commander: #8447c9; --commander-bg: #ede1fb; --input-bg: #ffffff;
   --frame-inner: rgba(57, 42, 82, 0.045);
 }
+/* Cybercore — Y2K / rough-nostalgic-tech dark theme (midnight void + screen-lit
+   accents). Everything the token system can express lives here; the shapes it
+   cannot (bevels, title bar, scanlines, glitch) live in the scoped section at
+   the bottom of this file. Dark-only by design. */
+[data-theme="cybercore"] {
+  --bg: #05030f; --bg-surface: #141030; --bg-surface-hover: #1d1840; --bg-elevated: #141030;
+  --border: #2a2458; --border-light: #4a4480;
+  --text: #e6e9ff; --text-dim: #a9adc7; --text-muted: #6f7390;
+  --accent: #7ad9ff; --accent-hover: #9fe0ff; --accent-glow: rgba(122, 217, 255, 0.28);
+  --accent-alt: #9b8cff; --accent-fg: #0a0718;
+  --danger: #ff5a7a; --danger-hover: #ff3b6b;
+  --success-bg: #0d2b2a; --error-bg: #2d0f1c;
+  --success: #48e0d8; --error: #ff5a7a;
+  --commander: #ffcf6e; --commander-bg: #2a2418; --input-bg: #0b0820;
+  /* hard corners everywhere; the "printed frame" hairline is off */
+  --radius: 2px; --radius-sm: 2px;
+  --frame-radius: 2px; --frame-radius-sm: 2px; --frame-inner: transparent;
+  /* chunky hard drops instead of soft glass shadows */
+  --shadow: 0 0 0 2px var(--void);
+  --shadow-lg: 0 0 0 2px var(--void), 6px 6px 0 0 rgba(10, 7, 24, 0.9);
+  --glow-accent: 0 0 14px rgba(122, 217, 255, 0.3);
+  /* Cybercore-only palette extras */
+  --void: #0a0718;
+  --pink: #ff7ad9;
+  --teal: #48e0d8;
+  --chrome: #c0c4cc;
+  --holo: conic-gradient(from 210deg, #ff7ad9, #9b8cff, #7ad9ff, #9fe8e2, #c0c4cc, #ffb3e0, #ff7ad9);
+  /* same pearl stops, swept linearly — for surfaces too small to show a conic */
+  --holo-sweep: linear-gradient(100deg, #ff7ad9, #9b8cff, #7ad9ff, #9fe8e2, #c0c4cc, #ffb3e0, #ff7ad9);
+  /* Pixel face = labels/buttons/headers at 7–10px only. VT323 = all data. */
+  --font-pixel: 'Press Start 2P', 'Courier New', monospace;
+  --font-mono-crt: 'VT323', 'Courier New', monospace;
+  --font-display: var(--font-pixel);
+  --font-mono: var(--font-mono-crt);
+}
 
 /* ── Typography & frame tokens ── */
 :root {
@@ -843,6 +878,8 @@ button.foil-badge { cursor: pointer; font-family: var(--font-sans); }
   border-bottom: 1px solid var(--border);
 }
 .card-row:last-child { border-bottom: none; }
+/* card name inside a deck-modal row (size lives here so themes can restyle it) */
+.card-row-name { font-size: 0.78rem; }
 .card-row .thumb { width: 28px; border-radius: 3px; flex-shrink: 0; display: block; }
 .card-row .thumb-empty {
   width: 28px;
@@ -1153,4 +1190,437 @@ button.foil-badge { cursor: pointer; font-family: var(--font-sans); }
   .header-tools { margin-left: 0; width: 100%; }
   .header-tools .search-wrap { flex: 1; }
   .header-stats { order: 3; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CYBERCORE — structural additions (shapes the token system can't express)
+
+   Every selector below is prefixed with [data-theme="cybercore"], so the
+   other nine themes are byte-for-byte unaffected. The `cc-*` keyframes are
+   inert until referenced inside that scope. All motion is gated behind
+   `prefers-reduced-motion: no-preference`; the static baseline is legible
+   on its own (scanlines stay, crawl/glitch/blink do not).
+   Type roles: Press Start 2P = labels/buttons/heads at 7–10px only,
+   VT323 = data (names, numbers, rows), --font-sans = body copy.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes cc-crawl { to { background-position: 72px 0; } }
+@keyframes cc-holo { to { background-position: 300% 0; } }
+@keyframes cc-blink { 50% { opacity: 0; } }
+@keyframes cc-tear-a {
+  0%, 88%, 100% { clip-path: inset(38% 0 54% 0); transform: translateX(-2px); }
+  90% { clip-path: inset(14% 0 72% 0); transform: translateX(-5px); }
+  94% { clip-path: inset(62% 0 26% 0); transform: translateX(4px); }
+}
+@keyframes cc-tear-b {
+  0%, 88%, 100% { clip-path: inset(60% 0 28% 0); transform: translateX(2px); }
+  91% { clip-path: inset(70% 0 18% 0); transform: translateX(6px); }
+  95% { clip-path: inset(24% 0 66% 0); transform: translateX(-4px); }
+}
+
+/* ── CRT canvas: scanlines + dither noise painted as the body background, so
+      they sit strictly *behind* every surface and never over body text. ── */
+[data-theme="cybercore"] body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(120% 90% at 50% 0%, rgba(60, 60, 140, 0.18), transparent 60%),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(90, 110, 255, 0.08) 3px 4px),
+    repeating-conic-gradient(rgba(160, 170, 255, 0.045) 0 25%, transparent 0 50%);
+  background-size: 100% 100%, 100% 4px, 4px 4px;
+  background-attachment: fixed;
+}
+[data-theme="cybercore"] ::-webkit-scrollbar-thumb { border-radius: 0; }
+
+/* ── Header as an OS window ── */
+[data-theme="cybercore"] .app-header {
+  margin: 10px clamp(0.5rem, 2.5vw, 1.2rem) 6px;
+  padding: 2.2rem clamp(0.75rem, 2vw, 1.1rem) 0.85rem;
+  border: 2px solid var(--border);
+  box-shadow: 0 0 0 2px var(--void), 3px 3px 0 0 var(--void);
+}
+/* the soft gradient rule belongs to the other themes' chrome */
+[data-theme="cybercore"] .app-header::after { display: none; }
+
+/* The header's decorative mana watermark is an aria-hidden, absolutely
+   positioned <div> with two free pseudo-elements — reused here as the
+   window title bar (RGB strip + .EXE label + blocky window dots) so
+   Header.tsx needs no extra markup. */
+[data-theme="cybercore"] .header-watermark {
+  inset: 4px 4px auto 4px;
+  height: 22px;
+  align-content: center;
+  align-items: center;
+  gap: 0;
+  padding: 0 5px;
+  font-size: 0;
+  opacity: 1;
+  border: 1px solid var(--void);
+  background: repeating-linear-gradient(90deg,
+    var(--accent) 0 18px, var(--accent-alt) 18px 36px, var(--pink) 36px 54px, var(--accent) 54px 72px);
+  background-size: 72px 100%;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+[data-theme="cybercore"] .header-watermark .ms { display: none; }
+[data-theme="cybercore"] .header-watermark::before {
+  content: 'C-EDH-CUBE.EXE';
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  background: var(--bg);
+  border: 1px solid var(--void);
+  padding: 3px 7px;
+}
+[data-theme="cybercore"] .header-watermark::after {
+  content: '';
+  margin-left: auto;
+  width: 44px;
+  height: 10px;
+  background: repeating-linear-gradient(90deg, var(--chrome) 0 10px, transparent 10px 17px);
+}
+
+/* ── Wordmark: pixel arcade face, holo `EDH`, RGB-split glitch copies ── */
+[data-theme="cybercore"] .wordmark {
+  position: relative;
+  font-family: var(--font-pixel);
+  font-size: clamp(12px, 1.6vw, 17px);
+  letter-spacing: 0;
+  line-height: 1.3;
+  color: var(--accent);
+  text-shadow: 2px 0 rgba(255, 122, 217, 0.5);
+}
+[data-theme="cybercore"] .wordmark b {
+  background: var(--holo);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+[data-theme="cybercore"] .wordmark::before,
+[data-theme="cybercore"] .wordmark::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  text-shadow: none;
+}
+[data-theme="cybercore"] .wordmark::before {
+  color: var(--pink);
+  clip-path: inset(38% 0 54% 0);
+  transform: translateX(-2px);
+  opacity: 0.85;
+}
+[data-theme="cybercore"] .wordmark::after {
+  color: var(--teal);
+  clip-path: inset(60% 0 28% 0);
+  transform: translateX(2px);
+  opacity: 0.85;
+}
+
+/* ── HUD stats: CRT numerals + pixel captions ── */
+[data-theme="cybercore"] .stat-value {
+  font-family: var(--font-mono-crt);
+  font-size: 22px;
+  color: var(--commander);
+  text-shadow: 0 0 6px rgba(255, 207, 110, 0.4);
+}
+[data-theme="cybercore"] .stat-label {
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+[data-theme="cybercore"] .stat-sep { width: 2px; height: 28px; background: var(--border-light); }
+
+/* ── Folder tabs sitting on the window's bottom rail ── */
+[data-theme="cybercore"] .tabs {
+  margin: 0 clamp(0.5rem, 2.5vw, 1.2rem);
+  padding: 0 6px;
+  gap: 3px;
+  background: transparent;
+  border-bottom: 2px solid var(--border-light);
+}
+[data-theme="cybercore"] .tab {
+  position: relative;
+  top: 2px;
+  margin-bottom: -2px;
+  padding: 8px 13px 7px;
+  background: #0f0b26;
+  border: 2px solid var(--border);
+  border-bottom: none;
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  letter-spacing: 1px;
+  transition: none;
+}
+[data-theme="cybercore"] .tab svg { width: 12px; height: 12px; }
+[data-theme="cybercore"] .tab[aria-selected="true"] {
+  background: var(--bg-surface);
+  border-color: var(--border-light);
+  box-shadow: 0 0 10px var(--accent-glow);
+  font-weight: 400;
+}
+
+/* ── Flat panels: hard 2px edge + chunky black drop, zero glass ── */
+[data-theme="cybercore"] .frame,
+[data-theme="cybercore"] .coll-card,
+[data-theme="cybercore"] .theme-menu,
+[data-theme="cybercore"] .card-zoom-pop,
+[data-theme="cybercore"] .toast {
+  border-width: 2px;
+  border-radius: 0;
+  box-shadow: 0 0 0 2px var(--void);
+}
+[data-theme="cybercore"] .frame-hover:hover,
+[data-theme="cybercore"] .coll-card:hover {
+  transform: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--void), 0 0 14px var(--accent-glow);
+}
+[data-theme="cybercore"] .modal-panel {
+  border-width: 2px;
+  border-radius: 0;
+  box-shadow: 0 0 0 2px var(--void), 6px 6px 0 0 rgba(10, 7, 24, 0.9);
+}
+[data-theme="cybercore"] .modal-backdrop {
+  background: rgba(5, 3, 15, 0.78);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-theme="cybercore"] .divider { height: 2px; }
+[data-theme="cybercore"] .deck-row::before { width: 4px; border-radius: 0; }
+[data-theme="cybercore"] .cmd-art,
+[data-theme="cybercore"] .cmd-placeholder,
+[data-theme="cybercore"] .card-row .thumb,
+[data-theme="cybercore"] .card-row .thumb-empty,
+[data-theme="cybercore"] .theme-swatch { border-radius: 0; }
+/* commander ring: hard 2px cast instead of the soft double halo */
+[data-theme="cybercore"] .cmd-art { box-shadow: 0 0 0 2px var(--void), 0 0 0 3px var(--commander); }
+[data-theme="cybercore"] .cmd-placeholder { border-width: 2px; }
+
+/* ── 90s bevelled controls (light top/left, void bottom/right; inverted on :active) ── */
+[data-theme="cybercore"] .btn,
+[data-theme="cybercore"] .btn-ghost,
+[data-theme="cybercore"] .icon-btn {
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  letter-spacing: 1px;
+  border-top: 2px solid var(--border-light);
+  border-left: 2px solid var(--border-light);
+  border-bottom: 2px solid var(--void);
+  border-right: 2px solid var(--void);
+  transition: none;
+}
+[data-theme="cybercore"] .btn {
+  padding: 9px 11px;
+  font-size: 8px;
+  font-weight: 400;
+}
+[data-theme="cybercore"] .btn svg { width: 12px; height: 12px; }
+[data-theme="cybercore"] .btn:hover:not(:disabled) { box-shadow: 0 0 14px var(--accent-glow); }
+[data-theme="cybercore"] .btn-ghost,
+[data-theme="cybercore"] .icon-btn {
+  background: var(--bg-surface-hover);
+  color: var(--text-dim);
+}
+[data-theme="cybercore"] .btn-ghost { padding: 8px 10px; font-size: 7px; }
+[data-theme="cybercore"] .btn-ghost svg { width: 11px; height: 11px; }
+[data-theme="cybercore"] .icon-btn.bare { border-color: transparent; background: transparent; }
+[data-theme="cybercore"] .btn:active:not(:disabled),
+[data-theme="cybercore"] .btn-ghost:active:not(:disabled),
+[data-theme="cybercore"] .icon-btn:active {
+  border-top-color: var(--void);
+  border-left-color: var(--void);
+  border-bottom-color: var(--border-light);
+  border-right-color: var(--border-light);
+  transform: translate(1px, 1px);
+}
+/* square inputs + CRT decklist blob; body inputs keep the readable sans */
+[data-theme="cybercore"] .field,
+[data-theme="cybercore"] .qty-input,
+[data-theme="cybercore"] .swatch-input,
+[data-theme="cybercore"] .oracle-text {
+  border-radius: 0;
+  border-width: 2px;
+}
+[data-theme="cybercore"] .field:focus { box-shadow: 0 0 0 2px var(--accent-glow); }
+[data-theme="cybercore"] .qty-input { font-family: var(--font-mono-crt); font-size: 15px; }
+[data-theme="cybercore"] .search-wrap > svg { color: var(--accent); }
+/* chips carry deck/type names — data face, hard square edge */
+[data-theme="cybercore"] .chip {
+  border-radius: 0;
+  border-width: 2px;
+  font-family: var(--font-mono-crt);
+  font-size: 14px;
+  line-height: 1.2;
+  transition: none;
+}
+[data-theme="cybercore"] .chip[aria-pressed="true"] { box-shadow: 0 0 10px var(--accent-glow); font-weight: 400; }
+[data-theme="cybercore"] .filter-label,
+[data-theme="cybercore"] .meta-label {
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+[data-theme="cybercore"] .theme-option {
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+[data-theme="cybercore"] .theme-option[aria-checked="true"] { font-weight: 400; }
+
+/* ── Section heads: pixel label, blinking cursor, dithered rule ── */
+[data-theme="cybercore"] .section-head h2 { font-size: 10px; letter-spacing: 1px; }
+[data-theme="cybercore"] .section-head h3 { font-size: 9px; letter-spacing: 1px; }
+[data-theme="cybercore"] .section-head h2::after,
+[data-theme="cybercore"] .section-head h3::after {
+  content: '_';
+  color: var(--accent);
+  margin-left: 2px;
+}
+[data-theme="cybercore"] .section-head::after {
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--border) 0 3px, transparent 3px 6px);
+}
+
+/* ── Data rows: VT323 for every name / number the app prints ── */
+[data-theme="cybercore"] .deck-name { font-family: var(--font-mono-crt); font-size: 19px; letter-spacing: 0.5px; font-weight: 400; }
+[data-theme="cybercore"] .deck-commander { font-family: var(--font-mono-crt); font-size: 15px; }
+[data-theme="cybercore"] .coll-name { font-family: var(--font-mono-crt); font-size: 17px; font-weight: 400; }
+[data-theme="cybercore"] .coll-type,
+[data-theme="cybercore"] .coll-meta {
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+[data-theme="cybercore"] .coll-body { border-top: 2px solid var(--void); }
+[data-theme="cybercore"] .modal-title,
+[data-theme="cybercore"] .display,
+[data-theme="cybercore"] .empty-state,
+[data-theme="cybercore"] .card-row,
+[data-theme="cybercore"] .picker-option,
+[data-theme="cybercore"] .result-row,
+[data-theme="cybercore"] .meta-commander,
+[data-theme="cybercore"] .meta-standing,
+[data-theme="cybercore"] .meta-player,
+[data-theme="cybercore"] .meta-tournament,
+[data-theme="cybercore"] .meta-wins,
+[data-theme="cybercore"] .meta-card-name,
+[data-theme="cybercore"] .meta-qty,
+[data-theme="cybercore"] .meta-stock-summary,
+[data-theme="cybercore"] .meta-stock-players,
+[data-theme="cybercore"] .meta-list-empty,
+[data-theme="cybercore"] .modal-sub,
+[data-theme="cybercore"] .curve-count {
+  font-family: var(--font-mono-crt);
+  font-weight: 400;
+}
+[data-theme="cybercore"] .modal-title { font-size: 20px; }
+[data-theme="cybercore"] .meta-player,
+[data-theme="cybercore"] .meta-card-name { font-size: 16px; }
+[data-theme="cybercore"] .meta-standing,
+[data-theme="cybercore"] .meta-wins,
+[data-theme="cybercore"] .meta-stock-summary,
+[data-theme="cybercore"] .meta-commander { font-size: 17px; }
+[data-theme="cybercore"] .meta-tournament,
+[data-theme="cybercore"] .meta-qty,
+[data-theme="cybercore"] .meta-stock-players,
+[data-theme="cybercore"] .modal-sub,
+[data-theme="cybercore"] .result-row,
+[data-theme="cybercore"] .picker-option { font-size: 14px; }
+[data-theme="cybercore"] .curve-count { font-size: 15px; }
+[data-theme="cybercore"] .empty-state { font-size: 16px; }
+[data-theme="cybercore"] .card-row-name { font-size: 16px; }
+[data-theme="cybercore"] .meta-count,
+[data-theme="cybercore"] .meta-stock-type,
+[data-theme="cybercore"] .curve-label {
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+[data-theme="cybercore"] .meta-count { border-radius: 0; border-width: 2px; padding: 3px 7px; }
+
+/* ── Badges: pixel qty chip, holographic foil mark ── */
+[data-theme="cybercore"] .qty-badge {
+  border-radius: 0;
+  padding: 1px 6px;
+  font-family: var(--font-mono-crt);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--void);
+  background: var(--commander);
+  border: 1px solid var(--void);
+  backdrop-filter: none;
+}
+[data-theme="cybercore"] .foil-badge {
+  border-radius: 0;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: var(--void);
+  /* conic reads flat at badge size — the same stops as a linear sweep do not */
+  background: var(--holo-sweep);
+  background-size: 300% 100%;
+  border: 1px solid var(--void);
+  animation: none;
+}
+[data-theme="cybercore"] .foil-badge.off {
+  background: var(--bg-surface-hover);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+[data-theme="cybercore"] .foil-sheen {
+  background: repeating-linear-gradient(0deg, rgba(122, 217, 255, 0.1) 0 2px, transparent 2px 4px);
+}
+[data-theme="cybercore"] .deck-dot { border-radius: 0; border-color: var(--void); }
+
+/* Missing art: CRT test pattern instead of the printed-card hatch */
+[data-theme="cybercore"] .coll-art-empty {
+  border-bottom: 2px solid var(--void);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(10, 7, 24, 0.72) 0 2px, transparent 2px 3px),
+    var(--holo);
+  background-size: 100% 3px, 180% 180%;
+}
+
+/* ── Mana curve: dither-banded bars + idle status strip ── */
+[data-theme="cybercore"] .curve-bar {
+  border-radius: 0;
+  border: 1px solid var(--void);
+  background: repeating-linear-gradient(0deg, var(--accent) 0 6px, #1a2a40 6px 8px);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+[data-theme="cybercore"] .curve-bar.mini {
+  border: none;
+  background: repeating-linear-gradient(0deg, var(--accent-alt) 0 3px, #1a1640 3px 4px);
+  box-shadow: none;
+}
+[data-theme="cybercore"] .curve-bars { border-bottom-width: 2px; }
+[data-theme="cybercore"] .curve-panel::after {
+  content: 'LOADING ASSETS [####    ]';
+  display: block;
+  margin-top: 9px;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+/* ── Motion: opt-in only. Static baseline above stays fully legible. ── */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="cybercore"] .header-watermark { animation: cc-crawl 1.4s linear infinite; }
+  [data-theme="cybercore"] .wordmark b { animation: cc-holo 7s linear infinite; }
+  [data-theme="cybercore"] .foil-badge { animation: cc-holo 4s linear infinite; }
+  [data-theme="cybercore"] .wordmark::before { animation: cc-tear-a 6s steps(1) infinite; }
+  [data-theme="cybercore"] .wordmark::after { animation: cc-tear-b 6s steps(1) infinite; }
+  [data-theme="cybercore"] .section-head h2::after,
+  [data-theme="cybercore"] .section-head h3::after { animation: cc-blink 1.1s steps(1) infinite; }
+}
+
+/* ── Mobile: keep the window square when the modal docks to the bottom ── */
+@media (max-width: 640px) {
+  [data-theme="cybercore"] .modal-panel { border-radius: 0; }
 }
