@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-export type Theme = 'default' | 'gruvbox' | 'dracula' | 'nord' | 'onedark' | 'monokai' | 'asimov' | 'blossom' | 'lilac';
+export type Theme = 'default' | 'gruvbox' | 'dracula' | 'nord' | 'onedark' | 'monokai' | 'asimov' | 'blossom' | 'lilac' | 'cybercore';
 
 interface ThemeContextType {
   theme: Theme;
@@ -47,6 +47,7 @@ export const THEMES: { value: Theme; label: string; swatch: [string, string, str
   { value: 'asimov', label: 'Asimov', swatch: ['#101010', '#ff8c00', '#ff8c00'] },
   { value: 'blossom', label: 'Blossom', swatch: ['#ffe9f0', '#e8558f', '#c9184a'] },
   { value: 'lilac', label: 'Lilac', swatch: ['#efe7fb', '#9b6bcf', '#8447c9'] },
+  { value: 'cybercore', label: 'Cybercore', swatch: ['#141030', '#7ad9ff', '#ffcf6e'] },
 ];
 
 export const DECK_COLOR_PRESETS = [
