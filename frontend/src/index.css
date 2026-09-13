@@ -33,6 +33,13 @@
   --error: #e05a5a;
   --commander: #ffe66d;
   --commander-bg: #2a2a1e;
+  /* Money accent — deliberately NOT the UI accent, so value never reads as a
+     control. Themes whose background would drown this amber override it. */
+  --money: #e0a64a;
+  --money-dim: #8a6b33;
+  --money-bg: rgba(224, 166, 74, 0.10);
+  --money-up: var(--success);
+  --money-down: var(--error);
   --input-bg: #16162a;
   --radius: 10px;
   --radius-sm: 6px;
@@ -117,6 +124,7 @@
   --success-bg: #e3f5e6; --error-bg: #fde3e6;
   --success: #3a9a5c; --error: #d63447;
   --commander: #c9184a; --commander-bg: #ffe0ea; --input-bg: #ffffff;
+  --money: #a86a12; --money-dim: #8a5a14; --money-bg: rgba(168, 106, 18, 0.10);
   --frame-inner: rgba(74, 34, 51, 0.045);
 }
 /* Lilac — soft light lavender theme. */
@@ -129,6 +137,7 @@
   --success-bg: #e2f5e6; --error-bg: #fbe4ea;
   --success: #3f9a5f; --error: #d1435c;
   --commander: #8447c9; --commander-bg: #ede1fb; --input-bg: #ffffff;
+  --money: #9a6a0f; --money-dim: #7d570f; --money-bg: rgba(154, 106, 15, 0.10);
   --frame-inner: rgba(57, 42, 82, 0.045);
 }
 /* Cybercore — Y2K / rough-nostalgic-tech dark theme (midnight void + screen-lit
@@ -145,6 +154,9 @@
   --success-bg: #0d2b2a; --error-bg: #2d0f1c;
   --success: #48e0d8; --error: #ff5a7a;
   --commander: #ffcf6e; --commander-bg: #2a2418; --input-bg: #0b0820;
+  /* Screen-lit gold; the deck-line palette below feeds the value chart. */
+  --money: #ffd85e; --money-dim: #b08a2e; --money-bg: rgba(255, 216, 94, 0.07);
+  --money-up: #48e0d8; --money-down: #ff7ad9;
   /* hard corners everywhere; the "printed frame" hairline is off */
   --radius: 2px; --radius-sm: 2px;
   --frame-radius: 2px; --frame-radius-sm: 2px; --frame-inner: transparent;
@@ -332,6 +344,99 @@ h1, h2, h3, .display {
   color: var(--text-muted);
 }
 .stat-sep { width: 1px; height: 22px; background: var(--border-light); flex-shrink: 0; }
+
+/* ═══ Money surfaces ═══
+   Amber everywhere value is shown, so money never reads as a control. */
+.value-hud { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; }
+.value-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--money) 55%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--money-bg);
+}
+.value-amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--money);
+  font-variant-numeric: tabular-nums;
+}
+.value-caption {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--money-dim);
+}
+.value-note {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  max-width: 15rem;
+  line-height: 1.3;
+}
+
+.deck-value {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--money);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.price-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.price-delta.up { color: var(--money-up); }
+.price-delta.down { color: var(--money-down); }
+
+.coll-price {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.price-value { color: var(--money); font-weight: 600; }
+.no-price { color: var(--text-muted); font-size: 0.66rem; letter-spacing: 0.04em; }
+.price-finish {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--money-dim);
+}
+
+.price-box {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 10px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--money) 55%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--money-bg);
+}
+.price-box-amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--money);
+  font-variant-numeric: tabular-nums;
+}
+.price-box-note {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--money-dim);
+}
 
 .header-tools {
   position: relative;
@@ -1332,6 +1437,45 @@ button.foil-badge { cursor: pointer; font-family: var(--font-sans); }
   color: var(--text-dim);
 }
 [data-theme="cybercore"] .stat-sep { width: 2px; height: 28px; background: var(--border-light); }
+
+/* ── Money: CRT gold numerals, pixel micro-captions ── */
+[data-theme="cybercore"] .value-box {
+  border: 2px solid var(--money);
+  box-shadow: 0 0 12px rgba(255, 216, 94, 0.22), inset 0 0 14px rgba(255, 216, 94, 0.06);
+}
+[data-theme="cybercore"] .value-amount,
+[data-theme="cybercore"] .price-box-amount,
+[data-theme="cybercore"] .deck-value {
+  font-family: var(--font-mono-crt);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--money);
+  text-shadow: 0 0 7px rgba(255, 216, 94, 0.45);
+}
+[data-theme="cybercore"] .deck-value { font-size: 20px; }
+[data-theme="cybercore"] .value-caption,
+[data-theme="cybercore"] .price-box-note,
+[data-theme="cybercore"] .price-finish {
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+[data-theme="cybercore"] .value-note,
+[data-theme="cybercore"] .price-delta,
+[data-theme="cybercore"] .no-price {
+  font-family: var(--font-pixel);
+  font-size: 6px;
+  letter-spacing: 0.6px;
+  line-height: 1.7;
+  text-transform: uppercase;
+}
+[data-theme="cybercore"] .price-value {
+  font-family: var(--font-mono-crt);
+  font-size: 16px;
+  font-weight: 400;
+}
+[data-theme="cybercore"] .price-box { border: 2px solid var(--money); }
 
 /* ── Folder tabs sitting on the window's bottom rail ── */
 [data-theme="cybercore"] .tabs {

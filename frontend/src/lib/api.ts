@@ -1,4 +1,7 @@
-import type { MetaCompareResult, MetaDeckOverview, MetaStockResult } from './types';
+import type {
+  CardHistory, CollectionHistory, MetaCompareResult, MetaDeckOverview, MetaStockResult,
+  PriceSummary, PriceWindow,
+} from './types';
 
 const BASE = '/api';
 
@@ -66,6 +69,15 @@ export const api = {
   getCollection: () => request<import('./types').CollectionCard[]>('/collection'),
   getCardDetails: (scryfallId: string) =>
     request<import('./types').CardDetail>(`/cards/details?scryfall_id=${encodeURIComponent(scryfallId)}`),
+
+  // Prices
+  getPriceSummary: () => request<PriceSummary>('/prices/summary'),
+  getCollectionHistory: (window: PriceWindow) =>
+    request<CollectionHistory>(`/prices/history?scope=collection&window=${window}`),
+  getCardHistory: (scryfallId: string, window: PriceWindow) =>
+    request<CardHistory>(
+      `/prices/history?scope=card&window=${window}&scryfall_id=${encodeURIComponent(scryfallId)}`),
+  refreshPrices: () => request<{ ok: boolean }>('/refresh-prices', { method: 'POST' }),
 
   // Import
   importMoxfield: (url: string, color?: string) =>

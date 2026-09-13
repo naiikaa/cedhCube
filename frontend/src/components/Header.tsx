@@ -2,6 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Check, Palette, Search } from 'lucide-react';
 import { useTheme, THEMES } from '../hooks/useTheme';
 import { ManaPip } from './ManaPip';
+import { CollectionValue } from './Price';
+import type { PriceSummary } from '../lib/types';
 
 /** Decorative watermark glyphs — repeated WUBRG cluster behind the header. */
 const WATERMARK = Array.from({ length: 40 }, (_, i) => ['w', 'u', 'b', 'r', 'g'][i % 5]);
@@ -68,11 +70,13 @@ export interface HeaderProps {
   deckCount: number;
   uniqueCards: number;
   totalCards: number;
+  /** Paper value of the whole collection; null until the summary loads. */
+  priceSummary: PriceSummary | null;
   /** Jumps to the Collection tab with the query pre-filled. */
   onSearch: (query: string) => void;
 }
 
-export function Header({ deckCount, uniqueCards, totalCards, onSearch }: HeaderProps) {
+export function Header({ deckCount, uniqueCards, totalCards, priceSummary, onSearch }: HeaderProps) {
   const [query, setQuery] = useState('');
 
   const stats: [number, string][] = [
@@ -106,6 +110,8 @@ export function Header({ deckCount, uniqueCards, totalCards, onSearch }: HeaderP
           </Fragment>
         ))}
       </div>
+
+      <CollectionValue summary={priceSummary} />
 
       <div className="header-tools">
         <form

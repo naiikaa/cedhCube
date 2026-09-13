@@ -4,7 +4,9 @@ import {
   Trash2, X,
 } from 'lucide-react';
 import { api } from './lib/api';
-import type { Deck, Card, CollectionCard, CardResult, CmcStats, CardDetail } from './lib/types';
+import type {
+  Deck, Card, CollectionCard, CardResult, CmcStats, CardDetail, PriceSummary,
+} from './lib/types';
 import { ColorIdentity } from './components/ColorIdentity';
 import { ManaCost, OracleText } from './components/ManaPip';
 import { FullManaCurve, MiniManaCurve } from './components/ManaCurve';
@@ -12,6 +14,7 @@ import { Header } from './components/Header';
 import { CardImage, Spinner } from './components/UI';
 import { useToast, Toast } from './components/Toast';
 import { MetaTab } from './components/MetaTab';
+import { CardPrice, PriceBox, PriceDelta, fmtEur } from './components/Price';
 
 const TABS = [
   { value: 'decks', label: 'Decks', Icon: Layers },
@@ -81,6 +84,10 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [enabledDeckIds, setEnabledDeckIds] = useState<Record<number, boolean>>({});
 
+  // ── Prices ──
+  const [priceSummary, setPriceSummary] = useState<PriceSummary | null>(null);
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
+
   // ── Card detail modal ──
   const [detailCard, setDetailCard] = useState<CollectionCard | null>(null);
   const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
@@ -109,8 +116,29 @@ export default function App() {
     api.getCollection().then(setAllCollection).catch(e => show(errText(e), 'error'));
   }, [show]);
 
+  // Prices are cached on the card rows, so this is one cheap query — never a
+  // Scryfall round trip.
+  const loadPrices = useCallback(() => {
+    api.getPriceSummary().then(setPriceSummary).catch(e => show(errText(e), 'error'));
+  }, [show]);
+
+  /** Pulls fresh prices from Scryfall in the background, then re-reads them. */
+  const refreshPrices = async () => {
+    setRefreshingPrices(true);
+    show('Refreshing prices…', 'info');
+    try {
+      await api.refreshPrices();
+      // The snapshot walks the collection in batches; give it a beat, then
+      // re-read whatever has landed.
+      setTimeout(() => { loadPrices(); loadCollection(); setRefreshingPrices(false); }, 8000);
+    } catch (e) {
+      show(errText(e), 'error');
+      setRefreshingPrices(false);
+    }
+  };
+
   // Collection is loaded up front so the header stats are live on first paint.
-  useEffect(() => { loadDecks(); loadCollection(); }, [loadDecks, loadCollection]);
+  useEffect(() => { loadDecks(); loadCollection(); loadPrices(); }, [loadDecks, loadCollection, loadPrices]);
 
   // Newly discovered decks default to "enabled" in the collection deck filter.
   useEffect(() => {
@@ -273,6 +301,12 @@ export default function App() {
     [allCollection],
   );
 
+  // Deck id → its paper value + 30d move, for the deck rows.
+  const deckValues = useMemo(
+    () => new Map((priceSummary?.decks ?? []).map(d => [d.id, d])),
+    [priceSummary],
+  );
+
   // ─── RENDER ───
 
   return (
@@ -287,6 +321,7 @@ export default function App() {
         deckCount={decks.length}
         uniqueCards={allCollection.length}
         totalCards={totalCards}
+        priceSummary={priceSummary}
         onSearch={globalSearch}
       />
 
@@ -346,6 +381,10 @@ export default function App() {
           {/* ─── Deck List ─── */}
           <div className="section-head">
             <h2>My Decks</h2>
+            <button type="button" className="btn-ghost head-action" onClick={refreshPrices} disabled={refreshingPrices}>
+              <RefreshCw className={refreshingPrices ? 'spin' : undefined} aria-hidden="true" />
+              Refresh Prices
+            </button>
             <button type="button" className="btn-ghost head-action" onClick={refreshImages} disabled={refreshingImages}>
               <RefreshCw className={refreshingImages ? 'spin' : undefined} aria-hidden="true" />
               Refresh Images
@@ -363,6 +402,7 @@ export default function App() {
             <div className="deck-list">
               {decks.map(deck => {
                 const cmds = deckCommanders(deck);
+                const value = deckValues.get(deck.id);
                 return (
                 <button key={deck.id} type="button"
                   className="frame frame-hover deck-row"
@@ -397,7 +437,11 @@ export default function App() {
                     <MiniManaCurve stats={deckStats[deck.id] || null} />
                   </span>
 
-                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
+                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+                    {value && value.value > 0 && (
+                      <span className="deck-value">{fmtEur(value.value)}</span>
+                    )}
+                    {value && <PriceDelta delta={value.delta_30d} />}
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{deck.card_count} cards</span>
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{deck.total_cards} total</span>
                   </span>
@@ -484,6 +528,8 @@ export default function App() {
                       {c.set_code && <span>·</span>}
                       <span>{c.deck_count} deck{c.deck_count !== 1 ? 's' : ''}</span>
                     </span>
+                    {/* Unit price only — the ×qty arithmetic lives in the modal. */}
+                    <CardPrice card={c} />
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
                       {c.decks?.filter(d => enabledDeckNames.has(d.name)).map(d => (
                         <span key={d.name} className="deck-dot" style={{ background: d.color }} title={d.name} />
@@ -671,6 +717,7 @@ export default function App() {
                   {detailCard.set_code && <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', letterSpacing: '0.06em' }}>{detailCard.set_code.toUpperCase()}</span>}
                   {detailCard.is_foil ? <span className="foil-badge">Foil</span> : null}
                 </div>
+                <PriceBox card={detailCard} quantity={detailCard.total_quantity} />
               </div>
 
               {/* Info column */}

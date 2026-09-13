@@ -27,6 +27,9 @@ export interface Card {
   cmc: number;
   type_line: string;
   is_foil: number;
+  /** EUR paper prices, both finishes, null when the printing has no listing. */
+  price_eur?: number | null;
+  price_eur_foil?: number | null;
 }
 
 export interface CollectionCard {
@@ -42,6 +45,8 @@ export interface CollectionCard {
   total_quantity: number;
   deck_count: number;
   is_foil: number;
+  price_eur?: number | null;
+  price_eur_foil?: number | null;
   decks: { name: string; color: string }[];
 }
 
@@ -62,6 +67,58 @@ export interface CardDetail {
   name_ja: string;
   oracle_text: string;
   rulings: CardRuling[];
+  price_eur?: number | null;
+  price_eur_foil?: number | null;
+}
+
+/** Window labels shared by the price charts, mirroring the Meta tab's language. */
+export type PriceWindow = '30D' | '90D' | '1Y' | 'ALL';
+
+export interface DeckValue {
+  id: number;
+  name: string;
+  color: string;
+  value: number;
+  /** Percentage change vs the closest snapshot ≥30 days old; null without one. */
+  delta_30d: number | null;
+}
+
+export interface PriceSummary {
+  currency: string;
+  total: number;
+  delta_30d: number | null;
+  priced_rows: number;
+  unpriced_rows: number;
+  /** SQL timestamp of the newest snapshot, null before the first one. */
+  last_snapshot: string | null;
+  decks: DeckValue[];
+}
+
+export interface CollectionHistoryPoint {
+  date: string;
+  total: number;
+  /** Deck id (as a string key) → that deck's value on this day. */
+  decks: Record<string, number>;
+}
+
+export interface CollectionHistory {
+  currency: string;
+  window: PriceWindow;
+  points: CollectionHistoryPoint[];
+  decks: { id: number; name: string; color: string }[];
+}
+
+export interface CardHistoryPoint {
+  date: string;
+  eur: number | null;
+  eur_foil: number | null;
+}
+
+export interface CardHistory {
+  currency: string;
+  window: PriceWindow;
+  scryfall_id: string;
+  points: CardHistoryPoint[];
 }
 
 export interface CardResult {
