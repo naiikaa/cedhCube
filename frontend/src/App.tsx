@@ -15,6 +15,7 @@ import { CardImage, Spinner } from './components/UI';
 import { useToast, Toast } from './components/Toast';
 import { MetaTab } from './components/MetaTab';
 import { CardPrice, PriceBox, PriceDelta, fmtEur } from './components/Price';
+import { CardSparkline, ValueHistoryPanel } from './components/PriceChart';
 
 const TABS = [
   { value: 'decks', label: 'Decks', Icon: Layers },
@@ -463,6 +464,9 @@ export default function App() {
             </span>
           </div>
 
+          {/* Value over time */}
+          <ValueHistoryPanel onError={showError} />
+
           {/* Search */}
           <input type="search" className="field" style={{ marginBottom: 12 }}
             placeholder="Search cards…" aria-label="Search cards"
@@ -718,6 +722,7 @@ export default function App() {
                   {detailCard.is_foil ? <span className="foil-badge">Foil</span> : null}
                 </div>
                 <PriceBox card={detailCard} quantity={detailCard.total_quantity} />
+                <CardSparkline scryfallId={detailCard.scryfall_id} isFoil={!!detailCard.is_foil} />
               </div>
 
               {/* Info column */}
