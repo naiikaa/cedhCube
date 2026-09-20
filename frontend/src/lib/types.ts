@@ -200,6 +200,32 @@ export interface MetaStockResult extends MetaFilters {
   missed_count: number;
 }
 
+export interface MulliganCard {
+  name: string;
+  mana_cost: string;
+  image_url: string;
+  type_line: string;
+  /** Copies of this card in the deck — a 4-of can legitimately show up twice. */
+  quantity: number;
+}
+
+export interface MulliganEnemy {
+  /** edhtop16 commander key: "A" solo, "A / B" for partners. */
+  name: string;
+  image_url: string;
+}
+
+export interface MulliganDeal {
+  deck_id: number;
+  deck_name: string;
+  /** 1–4; cEDH pods seat four. */
+  seat: number;
+  /** Cards that must be shipped this round (0–4). */
+  ship_count: number;
+  hand: MulliganCard[];
+  enemies: MulliganEnemy[];
+}
+
 export interface ApiError {
   error: string;
 }

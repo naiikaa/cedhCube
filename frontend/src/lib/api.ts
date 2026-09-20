@@ -1,6 +1,6 @@
 import type {
   CardHistory, CollectionHistory, MetaCompareResult, MetaDeckOverview, MetaStockResult,
-  PriceSummary, PriceWindow,
+  MulliganDeal, PriceSummary, PriceWindow,
 } from './types';
 
 const BASE = '/api';
@@ -105,6 +105,13 @@ export const api = {
       body: JSON.stringify({
         deck_id: deckId, top_n: topN, time_period: timePeriod, min_event_size: minEventSize,
       }),
+    }),
+
+  // Mulligan practice
+  dealMulligan: (deckId: number) =>
+    request<MulliganDeal>('/mulligans/deal', {
+      method: 'POST',
+      body: JSON.stringify({ deck_id: deckId }),
     }),
 
   // Images

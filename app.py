@@ -1,4 +1,5 @@
 """FastAPI backend for cEDHcube."""
+import random
 import re
 import threading
 import json
@@ -22,7 +23,7 @@ from scryfall import (parse_card_list, validate_and_resolve_card, lookup_card,
 from moxfield import fetch_moxfield_deck, extract_deck_id
 from prices import refresh_prices_async, start_price_daemon
 from edhtop16 import (clamp_filters, commander_key, get_commander_entries,
-                      get_entry_maindeck)
+                      get_entry_maindeck, get_top_commanders)
 
 app = FastAPI(title="cEDHcube")
 
@@ -88,6 +89,9 @@ class MetaStockRequest(BaseModel):
     top_n: int = 10
     time_period: Optional[str] = "THREE_MONTHS"
     min_event_size: Optional[int] = 16
+
+class MulliganRequest(BaseModel):
+    deck_id: int
 
 # ─── Commander Detection ───
 
@@ -713,6 +717,92 @@ def api_meta_stock(req: MetaStockRequest):
         "analyzed_entries": analyzed,
         "stock": cards,
         "missed_count": sum(1 for c in cards if not c["in_my_deck"]),
+    }
+
+
+# ─── Mulligan practice ───
+
+HAND_SIZE = 7
+POD_SIZE = 4            # cEDH pods seat four, you included
+MAX_SHIP = 4            # keep at least three cards, so the drill stays playable
+ENEMY_COUNT = 3
+TOP_COMMANDER_POOL = 40
+
+
+def _enemy_image(name):
+    """Commander art for an enemy pod. A throttled or missing Scryfall lookup
+    degrades to no image — it must never sink the whole deal."""
+    try:
+        info = lookup_card(name)
+    except Exception:
+        return ""
+    return (info or {}).get("image_url") or ""
+
+
+def _mulligan_enemies(own_key):
+    """Three random top-meta commanders to sit across from.
+
+    edhtop16 being down means an empty pod row, not a failed deal."""
+    try:
+        candidates = get_top_commanders(first=TOP_COMMANDER_POOL,
+                                        time_period="THREE_MONTHS",
+                                        min_tournament_size=16)
+    except RuntimeError:
+        return []
+
+    own = _norm(own_key)
+    pool = [c for c in candidates if _norm(c) != own]  # you don't play against yourself
+    picked = random.sample(pool, min(ENEMY_COUNT, len(pool)))
+
+    images = {}  # one Scryfall call per distinct primary commander
+    enemies = []
+    for key in picked:
+        # Partner keys are "A / B"; the art comes from the first partner.
+        primary = _primary_name(key.split(" / ")[0])
+        if primary not in images:
+            images[primary] = _enemy_image(primary)
+        enemies.append({"name": key, "image_url": images[primary]})
+    return enemies
+
+
+@app.post("/api/mulligans/deal")
+def api_mulligan_deal(req: MulliganRequest):
+    """One mulligan round: a weighted 7-card hand, a ship quota, a seat, and a pod."""
+    deck = get_deck(req.deck_id)
+    if not deck:
+        return JSONResponse({"error": "Deck not found"}, status_code=404)
+
+    commanders = _deck_commander_norms(deck)
+    # Weighted draw without replacement: every copy of a row is its own pool slot,
+    # so a 4-of is four times as likely to appear as a singleton.
+    pool = []
+    for row in get_deck_cards(req.deck_id) or []:
+        if _norm(row.get("card_name")) in commanders:
+            continue  # the command zone is never in an opening hand
+        pool.extend([row] * max(1, int(row.get("quantity") or 1)))
+
+    if len(pool) < HAND_SIZE:
+        return JSONResponse({"error": "Deck needs at least 7 non-commander cards"},
+                            status_code=400)
+
+    hand = [
+        {
+            "name": pool[i].get("card_name") or "",
+            "image_url": pool[i].get("image_url") or "",
+            "mana_cost": pool[i].get("mana_cost") or "",
+            "type_line": pool[i].get("type_line") or "",
+            "quantity": pool[i].get("quantity") or 1,
+        }
+        for i in random.sample(range(len(pool)), HAND_SIZE)
+    ]
+
+    return {
+        "deck_id": req.deck_id,
+        "deck_name": deck.get("name") or "",
+        "seat": random.randint(1, POD_SIZE),
+        "ship_count": random.randint(0, MAX_SHIP),
+        "hand": hand,
+        "enemies": _mulligan_enemies(_deck_commander_key(deck)),
     }
 
 

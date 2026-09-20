@@ -82,6 +82,14 @@ Pick a deck and see how its commander(s) are performing on **edhtop16** — real
 
 ---
 
+## Mulligans tab
+
+A single-round mulligan drill. Pick a deck and hit **Deal hand**: the backend draws seven cards weighted by quantity (the commander stays in the command zone), rolls a **ship quota** of 0–4 cards you must discard, seats you at a random position in a four-player pod, and fills the other three seats with commanders sampled live from **edhtop16**'s most-played list. Click cards to mark them shipped — the badge tracks *Shipped: N / quota* and **Lock hand** only unlocks on an exact match. Locking splits the round into the kept hand and a greyed *Shipped* strip so you can study exactly what you kept; **New round** re-rolls everything.
+
+![Mulligans tab](docs/screenshots/11-mulligans-tab.jpg)
+
+---
+
 ## Tech stack
 
 | Layer | Stack |
