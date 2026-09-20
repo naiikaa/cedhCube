@@ -19,6 +19,11 @@ TIME_PERIODS = ("ALL_TIME", "ONE_MONTH", "ONE_YEAR", "POST_BAN", "SIX_MONTHS", "
 _MAINDECK_TTL = 15 * 60
 _maindeck_cache: dict = {}
 
+# The global top-commander list is caller-independent, so it rides the same
+# 15-minute TTL, keyed by the filter pair it was fetched with.
+_COMMANDERS_TTL = 15 * 60
+_commanders_cache: dict = {}
+
 
 def _gql(query: str) -> dict:
     """POST a GraphQL query, return the `data` object. Raises RuntimeError."""
@@ -165,3 +170,44 @@ def get_entry_maindeck(commander_key_str: str, entry_id: str, first: int = 25,
         if node_id == entry_id:
             found = cards
     return found
+
+
+def _top_commanders_query(first: int, time_period: str, min_tournament_size: int) -> str:
+    """`Query.commanders` takes its window as plain arguments, not a `filters` object."""
+    return f"""
+    query {{
+      commanders(first: {int(first)}, sortBy: POPULARITY,
+                 timePeriod: {time_period}, minTournamentSize: {min_tournament_size}) {{
+        edges {{ node {{ name }} }}
+      }}
+    }}
+    """
+
+
+def get_top_commanders(first: int = 40, time_period: str = "THREE_MONTHS",
+                       min_tournament_size: int = 16) -> list:
+    """Most-played commander keys across the whole format, most popular first.
+
+    Names arrive in edhtop16's own key form — solo as "A", partner pairs as "A / B" —
+    so they feed straight back into `commander_key` comparisons. Cached for 15 minutes
+    per filter pair; callers re-roll their own sampling, so a cache hit is still fresh.
+    """
+    period, size = clamp_filters(time_period, min_tournament_size)
+    cache_key = (int(first), period, size)
+    cached = _commanders_cache.get(cache_key)
+    now = time.time()
+    if cached and now - cached[0] < _COMMANDERS_TTL:
+        return cached[1]
+
+    data = _gql(_top_commanders_query(first, period, size))
+    root = data.get("commanders") or {}
+    names = []
+    for edge in root.get("edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        name = ((edge.get("node") or {}).get("name") or "").strip()
+        if name:
+            names.append(name)
+
+    _commanders_cache[cache_key] = (now, names)
+    return names

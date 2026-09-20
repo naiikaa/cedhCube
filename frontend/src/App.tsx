@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
 import {
-  Check, CircleCheck, CircleX, Crown, ImageOff, Layers, LibraryBig, Pencil, RefreshCw, Swords,
-  Trash2, X,
+  Check, CircleCheck, CircleX, Crown, Dices, ImageOff, Layers, LibraryBig, Pencil, RefreshCw,
+  Swords, Trash2, X,
 } from 'lucide-react';
 import { api } from './lib/api';
 import type {
@@ -14,6 +14,7 @@ import { Header } from './components/Header';
 import { CardImage, Spinner } from './components/UI';
 import { useToast, Toast } from './components/Toast';
 import { MetaTab } from './components/MetaTab';
+import { MulliganTab } from './components/MulliganTab';
 import { CardPrice, PriceBox, PriceDelta, fmtEur } from './components/Price';
 import { CardSparkline, ValueHistoryPanel } from './components/PriceChart';
 
@@ -21,6 +22,7 @@ const TABS = [
   { value: 'decks', label: 'Decks', Icon: Layers },
   { value: 'collection', label: 'Collection', Icon: LibraryBig },
   { value: 'meta', label: 'Meta', Icon: Swords },
+  { value: 'mulligans', label: 'Mulligans', Icon: Dices },
 ] as const;
 
 type TabValue = (typeof TABS)[number]['value'];
@@ -550,6 +552,9 @@ export default function App() {
 
       {/* ═══════════════════ M E T A   T A B ═══════════════════ */}
       {tab === 'meta' && <MetaTab decks={decks} onError={showError} />}
+
+      {/* ═══════════════════ M U L L I G A N S   T A B ═══════════════════ */}
+      {tab === 'mulligans' && <MulliganTab decks={decks} onError={showError} />}
 
       {/* ═══════════════════ D E C K   M O D A L ═══════════════════ */}
       {modalDeck && (

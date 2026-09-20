@@ -1360,6 +1360,120 @@ button.foil-badge { cursor: pointer; font-family: var(--font-sans); }
   color: var(--text-dim);
 }
 
+/* ═══ Mulligan practice ═══ */
+/* Scoped to the tab's own action row so the global .chip keeps its single rule. */
+.mulligan-actions .chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.mulligan-actions .chip:disabled:hover { color: var(--text-dim); border-color: var(--border); }
+
+.mulligan-round { flex-wrap: wrap; row-gap: 0.4rem; }
+/* the leading glyph is a seat marker, not a commander crown */
+.mulligan-round > svg { color: var(--accent); }
+.mulligan-quota {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 2px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.mulligan-quota.is-free {
+  color: var(--success);
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+.mulligan-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.mulligan-pod, .mulligan-hand, .mulligan-kept, .mulligan-bin { margin-bottom: 1.3rem; }
+.mulligan-pod .section-head, .mulligan-hand .section-head,
+.mulligan-kept .section-head, .mulligan-bin .section-head { margin-bottom: 0.6rem; }
+.mulligan-enemy-row { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+.mulligan-enemy {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  max-width: 290px;
+  padding: 0.4rem 0.7rem 0.4rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+}
+.mulligan-enemy-name {
+  min-width: 0;
+  font-size: 0.73rem;
+  line-height: 1.35;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* Scryfall's art_crop ratio varies per card (full-art lands, DFCs), which would
+   leave every name on its own baseline — pin one ratio and crop to it instead. */
+.mulligan-card img, .mulligan-enemy img {
+  aspect-ratio: 626 / 457;
+  object-fit: cover;
+}
+.mulligan-hand-grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.8rem; }
+.mulligan-hand-grid-small { gap: 0.55rem; }
+.mulligan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+}
+button.mulligan-card { cursor: pointer; }
+button.mulligan-card:hover img { outline: 1px solid var(--accent); outline-offset: 1px; }
+button.mulligan-card:hover .mulligan-card-name { color: var(--accent); }
+.mulligan-card-meta { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.mulligan-card-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 0.73rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mulligan-card-shipped img { opacity: 0.3; filter: grayscale(1); }
+.mulligan-card-shipped .mulligan-card-name {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.mulligan-ship-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: var(--accent-fg);
+  background: var(--error);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
 /* ═══ Mobile ═══ */
 @media (max-width: 640px) {
   .card-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }

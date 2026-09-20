@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ArrowLeft, ArrowLeftRight, Check, Crown, Filter, Layers,
   MinusCircle, PlusCircle, Swords, Trophy, X,
@@ -10,7 +9,7 @@ import type {
   MetaStockCard, MetaStockResult,
 } from '../lib/types';
 import { ManaCost } from './ManaPip';
-import { CardImage, Spinner } from './UI';
+import { CardImage, CardZoom, cropUrl, Spinner } from './UI';
 
 /** `2026-06-13T14:30:00.000Z` → `13 Jun 2026`; unparseable dates pass through. */
 const fmtDate = (iso: string) => {
@@ -31,48 +30,6 @@ const TIME_OPTIONS = [
   { value: 'ALL_TIME', label: 'All time' },
 ];
 const SIZE_OPTIONS = [16, 32, 64, 128];
-
-/** Swap any Scryfall image size for `large` so hover previews show the whole card. */
-const previewUrl = (url: string) => {
-  if (!url) return '';
-  return url.replace(/\/(art_crop|normal)\//, '/large/');
-};
-
-/** Normalise any Scryfall card-frame image to its `art_crop` cutout for row thumbs. */
-const cropUrl = (url: string) => {
-  if (!url) return '';
-  return url.replace(/\/(normal|large|small|png)\//, '/art_crop/');
-};
-
-/** Hover a small thumb → enlarge the full card next to it (portal'd so scroll can't clip it). */
-function CardZoom({ url, name, children }: { url: string; name: string; children: ReactNode }) {
-  const [pop, setPop] = useState<{ left: number; top: number } | null>(null);
-  const large = previewUrl(url);
-  if (!large) return <>{children}</>;
-  const POP_W = 230;
-  return (
-    <span
-      className="card-zoom"
-      onMouseEnter={e => {
-        const r = e.currentTarget.getBoundingClientRect();
-        const placeLeft = r.right + POP_W + 16 > window.innerWidth;
-        setPop({ left: placeLeft ? r.left - POP_W - 8 : r.right + 8, top: r.top });
-      }}
-      onMouseLeave={() => setPop(null)}
-    >
-      {children}
-      {pop && createPortal(
-        <img
-          className="card-zoom-pop"
-          src={large}
-          alt={name}
-          style={{ left: pop.left, top: pop.top }}
-        />,
-        document.body,
-      )}
-    </span>
-  );
-}
 
 function CardList({ cards, showQty }: { cards: MetaCompareCard[]; showQty: boolean }) {
   if (cards.length === 0) {
