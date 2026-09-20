@@ -116,16 +116,3 @@ npx vite --host 0.0.0.0 --port 5173
 ```
 
 Open **http://localhost:5173**.
-
-## Regenerating these screenshots
-
-`docs/shoot.js` is a Playwright script that walks the running app and captures every screen shown above. With both dev servers running:
-
-```bash
-cd ~/magic-collection/docs
-npm install playwright --no-save   # first time only
-npx playwright install chromium    # first time only
-node shoot.js
-```
-
-Screenshots are written to `docs/screenshots/` as PNGs (convert to the JPEGs above with Pillow at quality 85). Note the price-history shots need two or more recorded snapshots to render a line — run once, let a second day's snapshot accumulate, then re-shoot.
