@@ -1,14 +1,8 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
-import { Check, Palette, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Search } from 'lucide-react';
 import { useTheme, THEMES } from '../hooks/useTheme';
-import { CommanderFrame } from './CommanderFrame';
 import { CollectionValue } from './Price';
 import type { PriceSummary } from '../lib/types';
-
-/** Decorative watermark glyphs — repeated WUBRG cluster behind the header. */
-const WATERMARK = Array.from({ length: 40 }, (_, i) => ['w', 'u', 'b', 'r', 'g'][i % 5]);
-
-const BRAND_PIPS = ['W', 'U', 'B', 'R', 'G'];
 
 function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
@@ -29,18 +23,20 @@ function ThemeSwitcher() {
     };
   }, [open]);
 
+  const current = THEMES.find(t => t.value === theme) ?? THEMES[0];
+
   return (
     <div className="theme-menu-wrap" ref={wrapRef}>
       <button
         type="button"
-        className="icon-btn"
+        className="theme-btn"
         aria-haspopup="true"
         aria-expanded={open}
         aria-label="Change theme"
         title="Change theme"
         onClick={() => setOpen(o => !o)}
       >
-        <Palette />
+        Theme ▸ {current.label}
       </button>
       {open && (
         <div className="theme-menu slide-down" role="menu">
@@ -87,32 +83,17 @@ export function Header({ deckCount, uniqueCards, totalCards, priceSummary, onSea
 
   return (
     <header className="app-header">
-      <div className="header-watermark" aria-hidden="true">
-        {WATERMARK.map((c, i) => <i key={i} className={`ms ms-${c}`} />)}
-      </div>
+      <h1 className="wordmark">c<b>EDH</b>cube <span className="wordmark-suffix">// collector's ledger</span></h1>
 
-      <div className="header-brand">
-        {/* The brand mark is the system's chrome signature: an empty commander seat. */}
-        <span className="brand-mark" aria-hidden="true">
-          <CommanderFrame commanders={[]} color="var(--accent)" identity={BRAND_PIPS} size="sm" />
-        </span>
-        {/* data-text feeds the cybercore theme's RGB-split glitch pseudo-elements. */}
-        <h1 className="wordmark" data-text="cEDHcube">c<b>EDH</b>cube</h1>
-      </div>
-
-      <div className="header-stats">
-        {stats.map(([value, label], i) => (
-          <Fragment key={label}>
-            {i > 0 && <span className="stat-sep" aria-hidden="true" />}
-            <div className="stat">
-              <span className="stat-value">{value.toLocaleString()}</span>
-              <span className="stat-label">{label}</span>
-            </div>
-          </Fragment>
+      <div className="mast-stats">
+        {stats.map(([value, label]) => (
+          <div key={label} className="mast-stat">
+            <span className="mast-stat-value">{value.toLocaleString()}</span>
+            <span className="mast-label">{label}</span>
+          </div>
         ))}
+        <CollectionValue summary={priceSummary} />
       </div>
-
-      <CollectionValue summary={priceSummary} />
 
       <div className="header-tools">
         <form
@@ -129,7 +110,6 @@ export function Header({ deckCount, uniqueCards, totalCards, priceSummary, onSea
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onSearch(query); } }}
-            style={{ width: 'clamp(140px, 22vw, 240px)', fontSize: '0.8rem' }}
           />
         </form>
         <ThemeSwitcher />

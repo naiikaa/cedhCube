@@ -4,12 +4,12 @@ export function MiniManaCurve({ stats }: { stats: CmcStats | null }) {
   if (!stats?.cmc_bars?.length) return null;
   const maxCount = Math.max(1, ...stats.cmc_bars.map(b => b.count));
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 16, marginTop: 5 }} aria-hidden="true">
+    <div className="curve-mini" aria-hidden="true">
       {stats.cmc_bars.map(b => (
         <div
           key={b.cmc}
           className="curve-bar mini"
-          style={{ width: 6, height: Math.max(2, Math.round((b.count / maxCount) * 16)) }}
+          style={{ height: Math.max(2, Math.round((b.count / maxCount) * 16)) }}
           title={`${b.label || b.cmc}: ${b.count}`}
         />
       ))}
@@ -21,29 +21,29 @@ export function FullManaCurve({ stats }: { stats: CmcStats | null }) {
   if (!stats?.cmc_bars?.length) return null;
   const maxCount = Math.max(1, ...stats.cmc_bars.map(b => b.count));
   return (
-    /* class names below are style hooks only (cybercore dither bands + idle strip). */
-    <section className="curve-panel" style={{ margin: '0.9rem 0 1rem' }}>
-      <div className="section-head">
+    <section className="curve-panel">
+      <div className="section-head is-sub">
         <h3>Mana Curve</h3>
       </div>
-      <div className="curve-bars" style={{
-        display: 'flex', alignItems: 'flex-end', gap: 4, height: 76,
-        padding: '0 0.25rem', borderBottom: '1px solid var(--border)',
-      }}>
+      <div className="curve-bars">
         {stats.cmc_bars.map(b => (
-          <div key={b.cmc} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <div className="curve-count" style={{ fontSize: '0.68rem', color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' }}>{b.count}</div>
+          <div key={b.cmc} className="curve-col">
+            <div className="curve-count">{b.count}</div>
             <div
               className="curve-bar"
-              style={{ width: '100%', height: Math.max(3, Math.round((b.count / maxCount) * 52)), transition: 'height 0.3s ease' }}
+              style={{ width: '100%', height: Math.max(3, Math.round((b.count / maxCount) * 52)) }}
             />
-            <div className="curve-label" style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{b.label || b.cmc}</div>
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: '1.1rem', marginTop: 7, fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-        <span>Avg CMC <strong style={{ color: 'var(--text)' }}>{stats.avg_cmc}</strong></span>
-        <span>Total <strong style={{ color: 'var(--text)' }}>{stats.total_cards}</strong></span>
+      <div className="curve-labels">
+        {stats.cmc_bars.map(b => (
+          <div key={b.cmc} className="curve-label">{b.label || b.cmc}</div>
+        ))}
+      </div>
+      <div className="curve-foot">
+        <span>Avg CMC<strong>{stats.avg_cmc}</strong></span>
+        <span>Total<strong>{stats.total_cards}</strong></span>
       </div>
     </section>
   );

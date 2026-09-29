@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Armchair, Check, Dices, Hand, Lock, RotateCcw, Swords, Users, X } from 'lucide-react';
+import { Armchair, Check, Dices, Hand, Lock, RotateCcw, X } from 'lucide-react';
 import { api } from '../lib/api';
 import type { Deck, MulliganCard, MulliganDeal } from '../lib/types';
 import { ManaCost } from './ManaPip';
@@ -22,7 +22,7 @@ function HandCard({
   const art = (
     <>
       <CardZoom url={card.image_url} name={card.name}>
-        <CardImage url={cropUrl(card.image_url)} name={card.name} size={width} style={{ borderRadius: 5 }} />
+        <CardImage url={cropUrl(card.image_url)} name={card.name} size={width} />
       </CardZoom>
       <span className="mulligan-card-meta">
         <span className="mulligan-card-name">{card.name}</span>
@@ -111,8 +111,9 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
   return (
     <div className="page">
       <div className="section-head">
+        <span className="sec-idx">04</span>
         <h2>Mulligans</h2>
-        <span className="head-action" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+        <span className="head-action head-note">
           one round · random ship quota · pod from edhtop16's top list
         </span>
       </div>
@@ -124,12 +125,11 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
         </div>
       ) : (
         <>
-          <div className="filter-row mulligan-actions" style={{ marginBottom: 18 }}>
+          <div className="filter-row mulligan-actions">
             <label className="filter-label" htmlFor="mulligan-deck-select">Deck</label>
             <select
               id="mulligan-deck-select"
               className="field"
-              style={{ width: 'auto', minWidth: 240, flex: '0 1 auto' }}
               value={deckId ?? ''}
               onChange={e => selectDeck(Number(e.target.value))}
             >
@@ -199,7 +199,8 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
 
               <section className="mulligan-pod">
                 <div className="section-head">
-                  <h3><Users size={14} aria-hidden="true" />Your pod</h3>
+                  <span className="sec-idx">04.1</span>
+                  <h3>Your pod</h3>
                   <span className="head-action meta-count">{deal.enemies.length} opponents</span>
                 </div>
                 {deal.enemies.length === 0 ? (
@@ -209,12 +210,7 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
                     {deal.enemies.map(enemy => (
                       <div key={enemy.name} className="mulligan-enemy">
                         <CardZoom url={enemy.image_url} name={enemy.name}>
-                          <CardImage
-                            url={cropUrl(enemy.image_url)}
-                            name={enemy.name}
-                            size={56}
-                            style={{ borderRadius: 4 }}
-                          />
+                          <CardImage url={cropUrl(enemy.image_url)} name={enemy.name} size={56} />
                         </CardZoom>
                         <span className="mulligan-enemy-name">{enemy.name}</span>
                       </div>
@@ -227,7 +223,8 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
                 <>
                   <section className="mulligan-kept">
                     <div className="section-head">
-                      <h3><Hand size={14} aria-hidden="true" />Kept hand</h3>
+                      <span className="sec-idx">04.2</span>
+                      <h3>Kept hand</h3>
                       <span className="head-action meta-count">{kept.length} cards</span>
                     </div>
                     <div className="mulligan-hand-grid">
@@ -240,7 +237,8 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
                   {binned.length > 0 && (
                     <section className="mulligan-bin">
                       <div className="section-head">
-                        <h3><X size={14} aria-hidden="true" />Shipped</h3>
+                        <span className="sec-idx">04.3</span>
+                        <h3>Shipped</h3>
                         <span className="head-action meta-count">{binned.length} cards</span>
                       </div>
                       <div className="mulligan-hand-grid mulligan-hand-grid-small">
@@ -254,7 +252,8 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
               ) : (
                 <section className="mulligan-hand">
                   <div className="section-head">
-                    <h3><Swords size={14} aria-hidden="true" />Opening hand</h3>
+                    <span className="sec-idx">04.2</span>
+                    <h3>Opening hand</h3>
                     <span className="head-action meta-count">
                       {shipCount === 0 ? 'Lock to keep all 7' : 'Click cards to ship them'}
                     </span>

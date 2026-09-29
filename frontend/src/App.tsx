@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
 import {
-  Check, CircleCheck, CircleX, ClipboardList, Crown, Dices, ImageOff, Layers, Link, LibraryBig, Pencil, Plus,
-  RefreshCw, Swords, Trash2, X,
+  Check, CircleCheck, CircleX, ClipboardList, Crown, ImageOff, Link, LibraryBig, Pencil, Plus,
+  RefreshCw, Trash2, X,
 } from 'lucide-react';
 import { api } from './lib/api';
 import type {
@@ -11,7 +11,7 @@ import { ColorIdentity } from './components/ColorIdentity';
 import { ManaCost, OracleText } from './components/ManaPip';
 import { FullManaCurve, MiniManaCurve } from './components/ManaCurve';
 import { Header } from './components/Header';
-import { CardImage, Spinner, cropUrl } from './components/UI';
+import { CardImage, Spinner } from './components/UI';
 import { CommanderFrame } from './components/CommanderFrame';
 import { deckCommanders, type CommanderPick } from './lib/deck';
 import { useToast, Toast } from './components/Toast';
@@ -21,10 +21,10 @@ import { CardPrice, PriceBox, PriceDelta, fmtEur } from './components/Price';
 import { CardSparkline, ValueHistoryPanel } from './components/PriceChart';
 
 const TABS = [
-  { value: 'decks', label: 'Decks', Icon: Layers },
-  { value: 'collection', label: 'Collection', Icon: LibraryBig },
-  { value: 'meta', label: 'Meta', Icon: Swords },
-  { value: 'mulligans', label: 'Mulligans', Icon: Dices },
+  { value: 'decks', label: 'Decks' },
+  { value: 'collection', label: 'Collection' },
+  { value: 'meta', label: 'Meta' },
+  { value: 'mulligans', label: 'Mulligans' },
 ] as const;
 
 type TabValue = (typeof TABS)[number]['value'];
@@ -305,7 +305,7 @@ export default function App() {
   // ─── RENDER ───
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <div>
       {/* Toasts */}
       <div className="toast-stack">
         {toasts.map(t => <Toast key={t.id} message={t.message} type={t.type} onClose={() => remove(t.id)} />)}
@@ -322,10 +322,10 @@ export default function App() {
 
       {/* ═══ TABS ═══ */}
       <nav className="tabs" role="tablist" aria-label="Sections">
-        {TABS.map(({ value, label, Icon }) => (
+        {TABS.map(({ value, label }, i) => (
           <button key={value} type="button" role="tab" aria-selected={tab === value}
             className="tab" onClick={() => switchTab(value)}>
-            <Icon size={16} aria-hidden="true" />
+            <span className="tab-idx">{String(i + 1).padStart(2, '0')}</span>
             {label}
           </button>
         ))}
@@ -337,11 +337,8 @@ export default function App() {
 
           {/* ─── Deck List ─── */}
           <div className="section-head">
+            <span className="sec-idx">01</span>
             <h2>My Decks</h2>
-            <button type="button" className="btn head-action" onClick={() => openAdd()}>
-              <Plus aria-hidden="true" />
-              Add Deck
-            </button>
             <button type="button" className="btn-ghost head-action" onClick={refreshPrices} disabled={refreshingPrices}>
               <RefreshCw className={refreshingPrices ? 'spin' : undefined} aria-hidden="true" />
               Refresh Prices
@@ -350,12 +347,16 @@ export default function App() {
               <RefreshCw className={refreshingImages ? 'spin' : undefined} aria-hidden="true" />
               Refresh Images
             </button>
+            <button type="button" className="btn head-action" onClick={() => openAdd()}>
+              <Plus aria-hidden="true" />
+              Add Deck
+            </button>
           </div>
 
           {decksLoading ? (
             <div className="empty-state"><Spinner size={22} /></div>
           ) : decks.length === 0 ? (
-            <div className="empty-state is-crafted">
+            <div className="empty-state">
               <span className="empty-emblem" aria-hidden="true">
                 <CommanderFrame commanders={[]} size="lg" />
               </span>
@@ -371,28 +372,22 @@ export default function App() {
               {decks.map(deck => {
                 const cmds = deckCommanders(deck);
                 const value = deckValues.get(deck.id);
-                const hero = cmds.find(c => c.image)?.image;
                 return (
                 <button key={deck.id} type="button"
-                  className="frame frame-hover deck-row"
+                  className="deck-row"
                   style={{ '--deck-color': deck.color } as CSSProperties}
                   onClick={() => openDeck(deck)}
                 >
-                  {hero && (
-                    <span className="deck-row-art" aria-hidden="true"
-                      style={{ backgroundImage: `url("${cropUrl(hero)}")` }} />
-                  )}
-                  <CommanderFrame commanders={cmds} color={deck.color} identity={deck.color_identity} size="lg" />
+                  <CommanderFrame commanders={cmds} color={deck.color} size="lg" />
 
                   <span className="deck-row-main">
                     <span className="deck-name">{deck.name}</span>
                     {cmds.length > 0 ? (
                       <span className="deck-commander">
-                        <Crown aria-hidden="true" />
                         <span>{cmds.map(c => c.name).join(' // ')}</span>
                       </span>
                     ) : (
-                      <span className="deck-commander is-unset">No commander set</span>
+                      <span className="deck-commander is-unset">No commander set — pick after import</span>
                     )}
                     <span className="deck-row-foot">
                       <ColorIdentity identity={deck.color_identity} size="sm" />
@@ -403,12 +398,12 @@ export default function App() {
                   <span className="deck-stats">
                     {value && value.value > 0
                       ? <span className="deck-value">{fmtEur(value.value)}</span>
-                      : <span className="deck-value is-empty">—</span>}
+                      : <span className="deck-value is-empty">——</span>}
                     {value && <PriceDelta delta={value.delta_30d} />}
                     <span className="deck-count">
                       {deck.card_count}<span className="deck-count-sep">/</span>{deck.total_cards}
                     </span>
-                    <span className="stat-label">unique / total</span>
+                    <span className="deck-count-label">unique / total</span>
                   </span>
                 </button>
                 );
@@ -422,48 +417,73 @@ export default function App() {
       {tab === 'collection' && (
         <div className="page">
           <div className="section-head">
+            <span className="sec-idx">02</span>
             <h2>Collection</h2>
-            <span className="head-action" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-              {filteredCollection.length} of {allCollection.length}
+            <span className="head-action head-note">
+              {filteredCollection.length} of {allCollection.length} shown
             </span>
+          </div>
+
+          {/* Ledger band */}
+          <div className="ledger">
+            <div className="ledger-cell">
+              <span className="ledger-label">Paper value</span>
+              <span className="ledger-value">{priceSummary ? fmtEur(priceSummary.total) : '—'}</span>
+            </div>
+            <div className="ledger-cell">
+              <span className="ledger-label">30d change</span>
+              {priceSummary && priceSummary.delta_30d !== null
+                ? <span className="ledger-value"><PriceDelta delta={priceSummary.delta_30d} suffix="" /></span>
+                : <span className="ledger-value is-empty">—</span>}
+            </div>
+            <div className="ledger-cell">
+              <span className="ledger-label">Unique cards</span>
+              <span className="ledger-value">{allCollection.length.toLocaleString()}</span>
+            </div>
+            <div className="ledger-cell">
+              <span className="ledger-label">Total cards</span>
+              <span className="ledger-value">{totalCards.toLocaleString()}</span>
+            </div>
           </div>
 
           {/* Value over time */}
           <ValueHistoryPanel onError={showError} />
 
+          <div className="filters">
+            {/* Type filter */}
+            <div className="filter-row">
+              <span className="filter-label">Type</span>
+              {TYPE_FILTERS.map(t => (
+                <button key={t.value} type="button" className="chip" aria-pressed={typeFilter === t.value}
+                  onClick={() => setTypeFilter(t.value)}>
+                  {t.glyph && <i className={`ms ms-${t.glyph}`} aria-hidden="true" />}
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Deck filter */}
+            <div className="filter-row">
+              <span className="filter-label">Decks</span>
+              <button type="button" className="chip" aria-pressed={allDecksOn} onClick={toggleAll}>All</button>
+              {decks.map(d => (
+                <button key={d.id} type="button" className="chip chip-deck" aria-pressed={!!enabledDeckIds[d.id]}
+                  style={{ '--deck-color': d.color } as CSSProperties}
+                  onClick={() => toggleDeck(d.id)} title={d.name}>
+                  {d.name.length > 18 ? `${d.name.slice(0, 16)}…` : d.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Search */}
-          <input type="search" className="field" style={{ marginBottom: 12 }}
-            placeholder="Search cards…" aria-label="Search cards"
+          <input type="search" className="field search-field"
+            placeholder={`Search ${allCollection.length.toLocaleString()} cards…`} aria-label="Search cards"
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-
-          {/* Type filter */}
-          <div className="filter-row" style={{ marginBottom: 8 }}>
-            <span className="filter-label">Type</span>
-            {TYPE_FILTERS.map(t => (
-              <button key={t.value} type="button" className="chip" aria-pressed={typeFilter === t.value}
-                onClick={() => setTypeFilter(t.value)}>
-                {t.glyph && <i className={`ms ms-${t.glyph}`} aria-hidden="true" />}
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Deck filter */}
-          <div className="filter-row" style={{ marginBottom: 18 }}>
-            <span className="filter-label">Decks</span>
-            <button type="button" className="chip" aria-pressed={allDecksOn} onClick={toggleAll}>All</button>
-            {decks.map(d => (
-              <button key={d.id} type="button" className="chip chip-deck" aria-pressed={!!enabledDeckIds[d.id]}
-                style={{ '--deck-color': d.color } as CSSProperties}
-                onClick={() => toggleDeck(d.id)} title={d.name}>
-                {d.name.length > 18 ? `${d.name.slice(0, 16)}…` : d.name}
-              </button>
-            ))}
-          </div>
 
           {/* Grid */}
           {filteredCollection.length === 0 ? (
-            <div className="empty-state is-crafted">
+            <div className="empty-state">
               <span className="empty-emblem" aria-hidden="true"><LibraryBig /></span>
               <h3 className="empty-title">{allCollection.length === 0 ? 'The binder is empty' : 'Nothing matches'}</h3>
               <p>{allCollection.length === 0
@@ -488,14 +508,14 @@ export default function App() {
             <div className="card-grid">
               {filteredCollection.map(c => (
                 <button key={c.scryfall_id || c.card_name} type="button"
-                  className="frame frame-hover coll-card"
+                  className="coll-card"
                   onClick={() => openCardDetail(c)}
                 >
                   <span className="qty-badge">×{c.total_quantity}</span>
                   {c.is_foil ? <span className="foil-badge corner">Foil</span> : null}
 
                   {c.image_url ? (
-                    <span style={{ position: 'relative', display: 'block' }}>
+                    <span className="coll-art-wrap">
                       <img className="coll-art" src={c.image_url} alt={c.card_name} loading="lazy" />
                       {c.is_foil ? <span className="foil-sheen" /> : null}
                     </span>
@@ -505,17 +525,17 @@ export default function App() {
                     </span>
                   )}
 
-                  <span className="coll-body" style={{ display: 'block' }}>
-                    <span className="coll-name" style={{ display: 'block' }}>{c.card_name}</span>
-                    <span className="coll-type" style={{ display: 'block' }}>{c.type_line?.split('—')[0]?.trim() || ''}</span>
+                  <span className="coll-body">
+                    <span className="coll-name">{c.card_name}</span>
+                    <span className="coll-type">{c.type_line?.split('—')[0]?.trim() || ''}</span>
                     <span className="coll-meta">
-                      {c.set_code && <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>{c.set_code.toUpperCase()}</span>}
+                      {c.set_code && <span className="coll-set">{c.set_code.toUpperCase()}</span>}
                       {c.set_code && <span>·</span>}
                       <span>{c.deck_count} deck{c.deck_count !== 1 ? 's' : ''}</span>
                     </span>
                     {/* Unit price only — the ×qty arithmetic lives in the modal. */}
                     <CardPrice card={c} />
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
+                    <span className="coll-foot">
                       {c.decks?.filter(d => enabledDeckNames.has(d.name)).map(d => (
                         <span key={d.name} className="deck-dot" style={{ background: d.color }} title={d.name} />
                       ))}
@@ -556,7 +576,7 @@ export default function App() {
                 <button type="button" className="icon-btn bare" onClick={() => setAddOpen(false)} aria-label="Close"><X /></button>
               </div>
             </div>
-            <div className="segmented" role="tablist" aria-label="Add method" style={{ marginBottom: '1rem' }}>
+            <div className="segmented" role="tablist" aria-label="Add method">
               <button type="button" role="tab" className="segmented-opt" aria-selected={addMode === 'paste'} onClick={() => setAddMode('paste')}>
                 <ClipboardList aria-hidden="true" /> Paste list
               </button>
@@ -572,7 +592,7 @@ export default function App() {
                   <input type="color" className="swatch-input" aria-label="Deck colour"
                     value={deckColor} onChange={e => setDeckColor(e.target.value)} />
                 </div>
-                <textarea className="field mono" style={{ minHeight: 220 }}
+                <textarea className="field" style={{ minHeight: 220 }}
                   placeholder={'1 Thassa\'s Oracle\n1 Demonic Consultation\n1 Mana Crypt'}
                   value={deckCards} onChange={e => setDeckCards(e.target.value)} />
                 <div className="add-deck-actions">
@@ -612,7 +632,7 @@ export default function App() {
             <div className="modal-head">
               <div style={{ minWidth: 0 }}>
                 <h2 className="modal-title">{modalDeck.name}</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6 }}>
+                <div className="identity-line">
                   <span className="meta-label">Identity</span>
                   <ColorIdentity identity={modalCI} />
                 </div>
@@ -629,19 +649,19 @@ export default function App() {
 
             {/* Commanders */}
             <div className="deck-modal-cmd">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div className="deck-modal-cmd-row">
                 <CommanderFrame commanders={modalCommanders} color={modalDeck.color} identity={modalCI} size="lg" />
                 <div style={{ minWidth: 0 }}>
                   <div className="meta-label">{modalCommanders.length > 1 ? 'Commanders' : 'Commander'}</div>
                   {modalCommanders.length > 0 ? (
                     modalCommanders.map(c => (
-                      <div key={c.name} className="t-serif deck-modal-cmd-name">
+                      <div key={c.name} className="deck-modal-cmd-name">
                         <Crown size={13} aria-hidden="true" />
                         {c.name}
                       </div>
                     ))
                   ) : (
-                    <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem' }}>Not set</div>
+                    <div className="deck-modal-cmd-unset">Not set</div>
                   )}
                 </div>
                 {commanderCandidates.length > 0 && (
@@ -652,8 +672,8 @@ export default function App() {
                 )}
               </div>
               {showCommanderPicker && commanderCandidates.length > 0 && (
-                <div className="slide-down" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <div className="meta-label" style={{ marginBottom: 2 }}>
+                <div className="slide-down picker-list">
+                  <div className="meta-label" style={{ padding: '8px 0' }}>
                     Pick up to two (partner, background, friends forever) — a third replaces the first
                   </div>
                   {commanderCandidates.map(c => {
@@ -668,7 +688,7 @@ export default function App() {
                       </button>
                     );
                   })}
-                  <button type="button" className="picker-option" style={{ color: 'var(--text-muted)' }}
+                  <button type="button" className="picker-option is-clear"
                     onClick={() => setCommanders([])}>
                     <X size={14} aria-hidden="true" />
                     {modalCommanders.length > 1 ? 'Clear commanders' : 'Clear commander'}
@@ -678,17 +698,17 @@ export default function App() {
             </div>
 
             {/* Card search */}
-            <input type="search" className="field" style={{ fontSize: '0.8rem', marginBottom: 10 }}
+            <input type="search" className="field search-field"
               placeholder="Search cards in deck…" aria-label="Search cards in deck"
               value={modalSearch} onChange={e => setModalSearch(e.target.value)} />
 
             {/* Card list */}
-            <div style={{ marginBottom: 12 }}>
+            <div className="card-list">
               {modalCards.filter(c => !modalSearch || c.card_name.toLowerCase().includes(modalSearch.toLowerCase())).map(c => (
                 <div key={c.id} className="card-row">
                   <CardImage url={c.image_url} name={c.card_name} size={28} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="card-row-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.card_name}</div>
+                  <div className="card-row-body">
+                    <div className="card-row-name">{c.card_name}</div>
                     <ManaCost cost={c.mana_cost} />
                   </div>
                   <button type="button" className={`foil-badge${c.is_foil ? '' : ' off'}`}
@@ -707,20 +727,20 @@ export default function App() {
             </div>
 
             {/* Add cards */}
-            <div style={{ paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-              <textarea className="field mono" style={{ minHeight: 62, marginBottom: 8 }}
+            <div className="modal-section">
+              <textarea className="field" style={{ minHeight: 62, marginBottom: 10 }}
                 placeholder="Paste cards…" value={addCardsText} onChange={e => setAddCardsText(e.target.value)} />
               <button type="button" className="btn" onClick={addCards} disabled={addCardsLoading}>
                 {addCardsLoading ? <Spinner size={14} inline /> : null}
                 {addCardsLoading ? 'Validating…' : 'Add Cards'}
               </button>
               {addCardsResults.length > 0 && (
-                <div style={{ marginTop: 8 }}>
+                <div className="result-list">
                   {addCardsResults.map((r, i) => (
                     <div key={i} className={`result-row ${r.status === 'ok' ? 'ok' : 'bad'}`}>
                       {r.status === 'ok' ? <CircleCheck aria-hidden="true" /> : <CircleX aria-hidden="true" />}
                       <span>{r.requested} ×{r.quantity}</span>
-                      <span style={{ color: 'var(--text-dim)' }}>{r.status === 'ok' ? r.resolved : 'Not found'}</span>
+                      <span className="result-resolved">{r.status === 'ok' ? r.resolved : 'Not found'}</span>
                     </div>
                   ))}
                 </div>
@@ -728,8 +748,8 @@ export default function App() {
             </div>
 
             {/* Footer */}
-            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{modalDeck.card_count} cards</span>
+            <div className="modal-foot">
+              <span className="modal-foot-note">{modalDeck.card_count} cards</span>
               <button type="button" className="btn-ghost" onClick={closeModal}>Close</button>
             </div>
           </div>
@@ -752,20 +772,17 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+            <div className="detail-layout">
               {/* Card image */}
-              <div style={{ flexShrink: 0, width: 220, maxWidth: '100%' }}>
+              <div className="detail-side">
                 {detailCard.image_url ? (
-                  <img src={detailCard.image_url} alt={detailCard.card_name}
-                    style={{ width: '100%', height: 'auto', borderRadius: 'var(--frame-radius)', border: '1px solid var(--border)', display: 'block' }} />
+                  <img className="detail-art" src={detailCard.image_url} alt={detailCard.card_name} />
                 ) : (
-                  <div className="frame" style={{ width: '100%', height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    No image
-                  </div>
+                  <div className="detail-art-empty">No image</div>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                <div className="detail-print">
                   <ColorIdentity identity={detailCard.color_identity} />
-                  {detailCard.set_code && <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', letterSpacing: '0.06em' }}>{detailCard.set_code.toUpperCase()}</span>}
+                  {detailCard.set_code && <span className="detail-set">{detailCard.set_code.toUpperCase()}</span>}
                   {detailCard.is_foil ? <span className="foil-badge">Foil</span> : null}
                 </div>
                 <PriceBox card={detailCard} quantity={detailCard.total_quantity} />
@@ -773,36 +790,36 @@ export default function App() {
               </div>
 
               {/* Info column */}
-              <div style={{ flex: 1, minWidth: 260 }}>
+              <div className="detail-main">
                 {cardDetailLoading ? (
-                  <div style={{ padding: '2rem 0', textAlign: 'center' }}><Spinner size={20} /></div>
+                  <div className="detail-loading"><Spinner size={20} /></div>
                 ) : cardDetail ? (
                   <>
                     {/* Localized names */}
-                    <div style={{ marginBottom: 14 }}>
+                    <div className="detail-names">
                       {([['English', cardDetail.name_en], ['Deutsch', cardDetail.name_de], ['日本語', cardDetail.name_ja]] as const).map(([label, value]) => (
-                        <div key={label} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                          <span className="meta-label" style={{ width: 76, flexShrink: 0 }}>{label}</span>
-                          <span className="display" style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text)' }}>{value || '—'}</span>
+                        <div key={label} className="detail-name-row">
+                          <span className="meta-label">{label}</span>
+                          <span className="detail-name">{value || '—'}</span>
                         </div>
                       ))}
                     </div>
 
                     {/* Decks included */}
-                    <div style={{ marginBottom: 14 }}>
-                      <div className="meta-label" style={{ display: 'block', marginBottom: 6 }}>
+                    <div className="detail-block">
+                      <div className="meta-label">
                         Included in {detailCard.deck_count} deck{detailCard.deck_count !== 1 ? 's' : ''}
                       </div>
                       {detailCard.decks && detailCard.decks.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div className="detail-decks">
                           {detailCard.decks.map(d => (
-                            <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.8rem' }}>
-                              <span className="deck-dot" style={{ background: d.color, width: 11, height: 11 }} />
+                            <div key={d.name} className="detail-deck">
+                              <span className="deck-dot" style={{ background: d.color }} />
                               {d.name}
                             </div>
                           ))}
                         </div>
-                      ) : <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Not currently in any deck.</div>}
+                      ) : <div className="detail-muted" style={{ marginTop: 6 }}>Not currently in any deck.</div>}
                     </div>
 
                     {/* Oracle text */}
@@ -810,28 +827,28 @@ export default function App() {
                       ? <div className="oracle-text"><OracleText text={cardDetail.oracle_text} /></div>
                       : null}
                   </>
-                ) : <div style={{ padding: '1.5rem 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Could not load card details.</div>}
+                ) : <div className="detail-loading detail-muted">Could not load card details.</div>}
               </div>
             </div>
 
             {/* Rulings */}
-            <div style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-              <div className="meta-label" style={{ display: 'block', marginBottom: 8 }}>
+            <div className="modal-section">
+              <div className="meta-label">
                 Rulings{cardDetail && cardDetail.rulings.length > 0 ? ` (${cardDetail.rulings.length})` : ''}
               </div>
               {cardDetailLoading ? (
-                <div style={{ textAlign: 'center', padding: '0.5rem 0' }}><Spinner /></div>
+                <div className="detail-loading"><Spinner /></div>
               ) : cardDetail && cardDetail.rulings.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="rulings">
                   {cardDetail.rulings.map((r, i) => (
-                    <div key={i} style={{ fontSize: '0.8rem', lineHeight: 1.45 }}>
-                      <div style={{ color: 'var(--text)' }}>{r.comment}</div>
-                      {r.published_at && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2 }}>{r.published_at.slice(0, 10)}</div>}
+                    <div key={i} className="ruling">
+                      <div>{r.comment}</div>
+                      {r.published_at && <div className="ruling-date">{r.published_at.slice(0, 10)}</div>}
                     </div>
                   ))}
                 </div>
               ) : (!cardDetailLoading && cardDetail !== null) ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No rulings found for this card.</div>
+                <div className="detail-muted" style={{ marginTop: 8 }}>No rulings found for this card.</div>
               ) : null}
             </div>
           </div>

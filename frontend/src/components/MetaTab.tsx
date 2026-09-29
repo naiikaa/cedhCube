@@ -42,7 +42,7 @@ function CardList({ cards, showQty }: { cards: MetaCompareCard[]; showQty: boole
       {cards.map(c => (
         <div key={c.name} className="card-row">
           <CardZoom url={c.image_url} name={c.name}>
-            <CardImage url={cropUrl(c.image_url)} name={c.name} size={34} style={{ borderRadius: 3 }} />
+            <CardImage url={cropUrl(c.image_url)} name={c.name} size={34} />
           </CardZoom>
           <span className="meta-card-name">{c.name}</span>
           <ManaCost cost={c.mana_cost} />
@@ -92,7 +92,7 @@ function StockRow({ card, decksAnalyzed }: { card: MetaStockCard; decksAnalyzed:
         onClick={() => setOpen(v => !v)}
       >
         <CardZoom url={card.image_url} name={card.name}>
-          <CardImage url={card.image_url} name={card.name} size={34} style={{ borderRadius: 3 }} />
+          <CardImage url={card.image_url} name={card.name} size={34} />
         </CardZoom>
         <span className="meta-stock-body">
           <span className="meta-card-name">{card.name}</span>
@@ -129,7 +129,7 @@ function MyCardRow({ card, decksAnalyzed }: { card: MyMetaCard; decksAnalyzed: n
   return (
     <div className="card-row meta-stock-row">
       <CardZoom url={card.image_url} name={card.name}>
-        <CardImage url={cropUrl(card.image_url)} name={card.name} size={34} style={{ borderRadius: 3 }} />
+        <CardImage url={cropUrl(card.image_url)} name={card.name} size={34} />
       </CardZoom>
       <span className="meta-stock-body">
         <span className="meta-card-name">{card.name}</span>
@@ -182,10 +182,8 @@ function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: stri
 
       <section className="meta-section meta-section-missing">
         <div className="section-head">
-          <h3>
-            <PlusCircle size={14} aria-hidden="true" />
-            You're missing these
-          </h3>
+          <span className="sec-idx">03.1</span>
+          <h3>You're missing these</h3>
           <span className="head-action meta-count">{missing.length}</span>
         </div>
         {missing.length === 0 ? (
@@ -201,10 +199,8 @@ function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: stri
 
       <section className="meta-section">
         <div className="section-head">
-          <h3>
-            <Swords size={14} aria-hidden="true" />
-            Full stock list
-          </h3>
+          <span className="sec-idx">03.2</span>
+          <h3>Full stock list</h3>
           <button
             type="button"
             className="chip head-action"
@@ -228,10 +224,8 @@ function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: stri
 
       <section className="meta-section meta-section-mine">
         <div className="section-head">
-          <h3>
-            <MinusCircle size={14} aria-hidden="true" />
-            Your cards vs the meta
-          </h3>
+          <span className="sec-idx">03.3</span>
+          <h3>Your cards vs the meta</h3>
           <button
             type="button"
             className="chip head-action"
@@ -340,8 +334,9 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
   return (
     <div className="page">
       <div className="section-head">
+        <span className="sec-idx">03</span>
         <h2>Meta</h2>
-        <span className="head-action" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+        <span className="head-action head-note">
           edhtop16 · top results, {periodLabel.toLowerCase()}, events {minEventSize}+
         </span>
       </div>
@@ -353,12 +348,11 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
         </div>
       ) : (
         <>
-          <div className="filter-row" style={{ marginBottom: 18 }}>
+          <div className="filter-row meta-controls">
             <label className="filter-label" htmlFor="meta-deck-select">Deck</label>
             <select
               id="meta-deck-select"
-              className="field"
-              style={{ width: 'auto', minWidth: 240, flex: '0 1 auto' }}
+              className="field is-wide"
               value={deckId ?? ''}
               onChange={e => { closeCompare(); setDeckId(Number(e.target.value)); }}
             >
@@ -368,7 +362,6 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
             <select
               id="meta-topn-select"
               className="field"
-              style={{ width: 'auto', flex: '0 1 auto' }}
               value={topN}
               onChange={e => setTopN(Number(e.target.value))}
             >
@@ -378,7 +371,6 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
             <select
               id="meta-period-select"
               className="field"
-              style={{ width: 'auto', flex: '0 1 auto' }}
               value={timePeriod}
               onChange={e => { closeCompare(); setTimePeriod(e.target.value); }}
             >
@@ -388,7 +380,6 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
             <select
               id="meta-size-select"
               className="field"
-              style={{ width: 'auto', flex: '0 1 auto' }}
               value={minEventSize}
               onChange={e => { closeCompare(); setMinEventSize(Number(e.target.value)); }}
             >
@@ -448,7 +439,7 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
                 <button
                   key={entry.id}
                   type="button"
-                  className="frame frame-hover meta-entry"
+                  className="meta-entry"
                   aria-pressed={compareEntryId === entry.id}
                   onClick={() => openCompare(entry)}
                 >

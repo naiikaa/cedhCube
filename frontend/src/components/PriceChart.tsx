@@ -12,8 +12,8 @@ import { fmtEur, fmtEurCompact } from './Price';
 
 const WINDOWS: PriceWindow[] = ['30D', '90D', '1Y', 'ALL'];
 
-/** Deck lines cycle ice → violet → teal, matching the approved prototype. */
-const DECK_LINE_COLORS = ['var(--accent)', 'var(--accent-alt)', 'var(--success)', 'var(--chrome, var(--text-dim))'];
+/** Deck lines step down the ink ramp so the accent stays the collection total alone. */
+const DECK_LINE_COLORS = ['var(--ink)', 'var(--muted)', 'var(--faint)', 'var(--money-up)'];
 
 const VIEW_W = 1000;
 const VIEW_H = 240;
@@ -127,8 +127,8 @@ function Chart({ labels, series, height = 240, bare = false, gradientId }: Chart
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--money)" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="var(--money)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.1" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -211,7 +211,7 @@ function ChartHint({ points }: { points: number }) {
   );
 }
 
-/** Collection tab panel: total value in amber plus one line per deck. */
+/** Collection tab panel: total value as the accent line plus one ink line per deck. */
 export function ValueHistoryPanel({ onError }: { onError: (msg: string) => void }) {
   const [range, setRange] = useState<PriceWindow>('90D');
   const [history, setHistory] = useState<CollectionHistory | null>(null);
@@ -232,7 +232,7 @@ export function ValueHistoryPanel({ onError }: { onError: (msg: string) => void 
   const series: Series[] = useMemo(() => {
     if (!history) return [];
     const total: Series = {
-      key: 'total', label: 'Collection total', color: 'var(--money)', area: true,
+      key: 'total', label: 'Collection total', color: 'var(--accent)', area: true,
       values: history.points.map(p => p.total),
     };
     const decks = history.decks.map((d, i) => ({
@@ -247,11 +247,11 @@ export function ValueHistoryPanel({ onError }: { onError: (msg: string) => void 
   const latest = points.length > 0 ? points[points.length - 1].total : null;
 
   return (
-    <section className="frame frame-pad value-history" style={{ marginBottom: '1.1rem' }}>
-      <div className="section-head" style={{ marginBottom: 8 }}>
-        <h3>
-          Collection Value — {range}
-          {latest !== null && <span className="value-history-now"> {fmtEur(latest)}</span>}
+    <section className="value-history">
+      <div className="section-head is-sub">
+        <h3 className="chart-title">
+          Collection value · {range}
+          {latest !== null && <span className="value-history-now">{fmtEur(latest)} now</span>}
         </h3>
         <span className="head-action"><WindowSelect value={range} onChange={setRange} /></span>
       </div>
@@ -280,7 +280,7 @@ export function ValueHistoryPanel({ onError }: { onError: (msg: string) => void 
   );
 }
 
-/** Card-detail panel: one printing's price over time, drawn in the accent pink. */
+/** Card-detail panel: one printing's price over time, drawn in the accent. */
 export function CardSparkline({ scryfallId, isFoil }: { scryfallId: string; isFoil: boolean }) {
   const [range, setRange] = useState<PriceWindow>('90D');
   const [values, setValues] = useState<{ labels: string[]; data: (number | null)[] } | null>(null);
@@ -305,7 +305,7 @@ export function CardSparkline({ scryfallId, isFoil }: { scryfallId: string; isFo
 
   return (
     <div className="card-sparkline">
-      <div className="section-head" style={{ marginBottom: 4 }}>
+      <div className="section-head is-sub">
         <span className="meta-label">Price history</span>
         <span className="head-action"><WindowSelect value={range} onChange={setRange} /></span>
       </div>
@@ -317,7 +317,7 @@ export function CardSparkline({ scryfallId, isFoil }: { scryfallId: string; isFo
           height={104}
           bare
           gradientId={`spark-${scryfallId}`}
-          series={[{ key: 'card', label: 'Price', color: 'var(--pink, var(--accent))', values: data }]}
+          series={[{ key: 'card', label: 'Price', color: 'var(--accent)', values: data }]}
         />
       )}
     </div>

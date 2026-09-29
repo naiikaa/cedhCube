@@ -1,39 +1,37 @@
 import type { CSSProperties } from 'react';
-import { Crown } from 'lucide-react';
 import { parseColorIdentity } from '../lib/mana';
 import { cropUrl } from './UI';
 import type { CommanderPick } from '../lib/deck';
 
 /** Canonical WUBRG fills for the identity pip — never theme-tinted. */
 const MANA_HEX: Record<string, string> = {
-  W: '#f8f1d8', U: '#3f8fd8', B: '#5a4a52', R: '#e0543a', G: '#3d9a5a', C: '#b8b0a8',
+  W: '#f8f1d8', U: '#1460aa', B: '#1a1a1a', R: '#d33c22', G: '#2f6b2f', C: '#9a9488',
 };
 
-/** Conic slices of the colour identity, so a 3-colour deck shows three wedges. */
+/** Flat hard-stop bands of the colour identity, so a 3-colour deck shows three stripes. */
 function identityFill(identity: string | string[] | null | undefined): string {
   const colors = parseColorIdentity(identity);
   const list = colors.length ? colors : ['C'];
   if (list.length === 1) return MANA_HEX[list[0]] ?? MANA_HEX.C;
-  const step = 360 / list.length;
-  return `conic-gradient(${list.map((c, i) => `${MANA_HEX[c] ?? MANA_HEX.C} ${i * step}deg ${(i + 1) * step}deg`).join(', ')})`;
+  const step = 100 / list.length;
+  return `linear-gradient(90deg, ${list.map((c, i) => `${MANA_HEX[c] ?? MANA_HEX.C} ${i * step}% ${(i + 1) * step}%`).join(', ')})`;
 }
 
 export interface CommanderFrameProps {
   commanders: CommanderPick[];
-  /** Deck colour — drives the ring. Falls back to the commander gold. */
+  /** Deck colour — exposed to the frame as `--deck-color`. */
   color?: string;
   /** Colour identity for the pip; omitted → no pip. */
   identity?: string | string[] | null;
   size?: 'xs' | 'sm' | 'md' | 'lg';
-  /** Picker state: ring lights up in the deck colour. */
+  /** Picker state: the frame gets the accent outline. */
   active?: boolean;
 }
 
 /**
- * The system's chrome signature: commander art seated in a round ring in the
- * deck colour, with a seat shadow and an identity pip. Partners overlap.
- * Used identically on deck rows, the deck modal, the commander picker and the
- * meta tab, so a deck is recognisable wherever it appears.
+ * Commander art as a hard square block in a 1px ink frame, with an optional
+ * identity pip. Partners sit edge to edge. Used on deck rows, the deck modal,
+ * the commander picker and the meta tab, so a deck reads the same everywhere.
  */
 export function CommanderFrame({ commanders, color, identity, size = 'md', active = false }: CommanderFrameProps) {
   const style = color ? ({ '--deck-color': color } as CSSProperties) : undefined;
@@ -44,7 +42,7 @@ export function CommanderFrame({ commanders, color, identity, size = 'md', activ
         <span key={c?.name ?? i} className="cmd-frame-seat" title={c?.name}>
           {c?.image
             ? <img src={cropUrl(c.image)} alt="" loading="lazy" />
-            : <Crown aria-hidden="true" />}
+            : <span aria-hidden="true">◆</span>}
         </span>
       ))}
       {identity !== undefined && (

@@ -16,7 +16,7 @@ export function Toast({ message, type = 'info', onClose }: { message: string; ty
   return (
     <div className={`toast ${type}`} role="status">
       <Icon aria-hidden="true" />
-      <span style={{ flex: 1 }}>{message}</span>
+      <span className="toast-message">{message}</span>
       <button type="button" className="icon-btn bare" onClick={onClose} aria-label="Dismiss">
         <X />
       </button>

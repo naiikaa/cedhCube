@@ -1,4 +1,3 @@
-import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { PriceSummary } from '../lib/types';
 
 /** Anything carrying the two EUR price columns: a deck card or a collection entry. */
@@ -40,15 +39,13 @@ export function fmtSnapshot(ts: string | null): string {
   });
 }
 
-/** Signed percentage move, up in teal / down in pink. Absent history renders nothing. */
+/** Signed percentage move as a ledger figure: ▲ up / ▼ down. Absent history renders nothing. */
 export function PriceDelta({ delta, suffix = '30d' }: { delta: number | null; suffix?: string }) {
   if (delta === null || delta === undefined) return null;
   const up = delta >= 0;
-  const Icon = up ? TrendingUp : TrendingDown;
   return (
     <span className={`price-delta ${up ? 'up' : 'down'}`}>
-      <Icon size={11} aria-hidden="true" />
-      {up ? '+' : ''}{delta.toFixed(1)}% {suffix}
+      {up ? '▲' : '▼'}{Math.abs(delta).toFixed(1)}%{suffix ? ` ${suffix}` : ''}
     </span>
   );
 }
@@ -88,16 +85,17 @@ export function PriceBox({ card, quantity }: { card: Priced; quantity: number })
   );
 }
 
-/** Header HUD money box: the whole collection at paper value, plus its sync note. */
+/** Masthead money figure: the whole collection at paper value, its 30d move, and its sync note. */
 export function CollectionValue({ summary }: { summary: PriceSummary | null }) {
   return (
-    <div className="value-hud">
-      <div className="value-box">
+    <div className="mast-money">
+      <span className="mast-label">Paper value</span>
+      <span className="mast-money-row">
         <span className="value-amount">{summary ? fmtEur(summary.total) : '—'}</span>
-        <span className="value-caption">Collection Value</span>
-      </div>
+        {summary && <PriceDelta delta={summary.delta_30d} suffix="" />}
+      </span>
       <span className="value-note">
-        daily snapshot · 04:00 · last {fmtSnapshot(summary?.last_snapshot ?? null)}
+        snapshot 04:00 · last {fmtSnapshot(summary?.last_snapshot ?? null)}
         {summary && summary.unpriced_rows > 0 ? ` · ${summary.unpriced_rows} unpriced` : ''}
       </span>
     </div>
