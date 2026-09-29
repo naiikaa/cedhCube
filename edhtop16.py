@@ -24,9 +24,14 @@ _maindeck_cache: dict = {}
 _COMMANDERS_TTL = 15 * 60
 _commanders_cache: dict = {}
 
+# Lower-cased GraphQL error message edhtop16 sends for an empty commander query.
+_NO_ROWS = "query returned no rows"
+
 
 def _gql(query: str) -> dict:
-    """POST a GraphQL query, return the `data` object. Raises RuntimeError."""
+    """POST a GraphQL query, return the `data` object ({} for a no-rows result).
+
+    Raises RuntimeError on transport, HTTP, non-JSON, and any other GraphQL error."""
     try:
         res = requests.post(EDHTOP16_ENDPOINT, json={"query": query},
                             headers=HEADERS, timeout=20)
@@ -43,10 +48,14 @@ def _gql(query: str) -> dict:
 
     errors = payload.get("errors")
     if errors:
-        msg = ""
-        if isinstance(errors, list) and errors:
-            first = errors[0]
-            msg = first.get("message", "") if isinstance(first, dict) else str(first)
+        messages = [e.get("message", "") if isinstance(e, dict) else str(e)
+                    for e in (errors if isinstance(errors, list) else [errors])]
+        # edhtop16 reports "commander has no results for this filter" as an error
+        # with `data.commander: null` rather than an empty list — that is a normal
+        # empty result, not a failure. Any other error message still raises.
+        if messages and all(_NO_ROWS in m.lower() for m in messages):
+            return {}
+        msg = next((m for m in messages if _NO_ROWS not in m.lower()), "")
         raise RuntimeError(f"edhtop16 GraphQL error: {msg or 'unknown error'}")
 
     return payload.get("data") or {}
