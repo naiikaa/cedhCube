@@ -1,30 +1,38 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-export type Theme = 'default' | 'gruvbox' | 'dracula' | 'nord' | 'onedark' | 'monokai' | 'asimov' | 'blossom' | 'lilac' | 'cybercore';
+export type Theme = 'paper' | 'ink' | 'blueprint';
+
+const STORAGE_KEY = 'cedhcube-theme';
+const DEFAULT_THEME: Theme = 'paper';
 
 interface ThemeContextType {
   theme: Theme;
   setTheme: (t: Theme) => void;
 }
 
-const ThemeContext = createContext<ThemeContextType>({ theme: 'default', setTheme: () => {} });
+const ThemeContext = createContext<ThemeContextType>({ theme: DEFAULT_THEME, setTheme: () => {} });
+
+/** `swatch` mirrors each theme's [bg, accent, text] vars for the picker preview. */
+export const THEMES: { value: Theme; label: string; swatch: [string, string, string] }[] = [
+  { value: 'paper', label: 'Paper', swatch: ['#F4F1EA', '#FF3A00', '#171412'] },
+  { value: 'ink', label: 'Ink', swatch: ['#111113', '#FF3A00', '#ECE7DE'] },
+  { value: 'blueprint', label: 'Blueprint', swatch: ['#0B1A33', '#FFD23F', '#DCE7FF'] },
+];
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
+  // Stored values from the retired 10-theme system fall back to the default.
   const [theme, setThemeState] = useState<Theme>(() => {
-    return (localStorage.getItem('cedhcube-theme') as Theme) || 'default';
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return THEMES.some(t => t.value === stored) ? (stored as Theme) : DEFAULT_THEME;
   });
 
   const setTheme = (t: Theme) => {
     setThemeState(t);
-    localStorage.setItem('cedhcube-theme', t);
+    localStorage.setItem(STORAGE_KEY, t);
   };
 
   useEffect(() => {
-    if (theme === 'default') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
+    document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
   return (
@@ -35,23 +43,3 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const useTheme = () => useContext(ThemeContext);
-
-/** `swatch` mirrors each theme's [surface, accent, commander] vars for the picker preview. */
-export const THEMES: { value: Theme; label: string; swatch: [string, string, string] }[] = [
-  { value: 'default', label: 'Default', swatch: ['#16162a', '#e94560', '#ffe66d'] },
-  { value: 'gruvbox', label: 'Gruvbox', swatch: ['#32302f', '#fb4934', '#fabd2f'] },
-  { value: 'dracula', label: 'Dracula', swatch: ['#343746', '#ff79c6', '#f1fa8c'] },
-  { value: 'nord', label: 'Nord', swatch: ['#3b4252', '#88c0d0', '#ebcb8b'] },
-  { value: 'onedark', label: 'One Dark', swatch: ['#21252b', '#61afef', '#e5c07b'] },
-  { value: 'monokai', label: 'Monokai', swatch: ['#2d2e27', '#f92672', '#e6db74'] },
-  { value: 'asimov', label: 'Asimov', swatch: ['#101010', '#ff8c00', '#ff8c00'] },
-  { value: 'blossom', label: 'Blossom', swatch: ['#ffe9f0', '#e8558f', '#c9184a'] },
-  { value: 'lilac', label: 'Lilac', swatch: ['#efe7fb', '#9b6bcf', '#8447c9'] },
-  { value: 'cybercore', label: 'Cybercore', swatch: ['#141030', '#7ad9ff', '#ffcf6e'] },
-];
-
-export const DECK_COLOR_PRESETS = [
-  '#e94560','#4ecdc4','#ffe66d','#a8dadc','#f4a261',
-  '#9b5de5','#00bbf9','#00f5d4','#fee440','#f15bb5',
-  '#8338ec','#3a86ff','#ff006e','#fb5607','#80b918',
-];
