@@ -38,15 +38,22 @@ The search box in the header works from anywhere in the app: typing a card name 
 
 ## Valuing your collection
 
-EUR paper prices ride the existing Scryfall fetches — no extra calls. Scryfall's `prices` come back on every card the app already requests, so each deck card and collection entry shows a live unit price (foil-aware, with the other finish as fallback), and every deck, the header HUD, and the collection grid surface their paper value. A daily snapshot (04:00, plus catch-up at startup) records each card's price into `price_history`, powering the collection value chart above and the per-card sparkline in the card detail modal. Prices are deliberately EUR-only and surface with a distinct "money" accent, not the theme accent.
+EUR paper prices ride the existing Scryfall fetches — no extra calls. Scryfall's `prices` come back on every card the app already requests, so each deck card and collection entry shows a live unit price (foil-aware, with the other finish as fallback), and every deck, the header HUD, and the collection grid surface their paper value. A daily snapshot (04:00, plus catch-up at startup) records each card's price into `price_history`, powering the collection value chart above and the per-card sparkline in the card detail modal. Prices are deliberately EUR-only and surface as **ledger-style monospace figures** in the body ink (a subtle green/red Δ for the 30-day move) rather than a second accent colour.
 
 ## Theming
 
-Ten built-in color themes — Default, Gruvbox, Dracula, Nord, One Dark, Monokai, and Asimov match their editor namesakes' authentic palettes, plus two soft light themes, **Blossom** (pink) and **Lilac** (lavender). The tenth, **Cybercore**, is a deliberately rough, nostalgic Y2K/old-internet skin: midnight-void background, Press Start 2P pixel accent + VT323 CRT monospace, beveled Win95-style buttons, an OS-window title bar, glitch wordmark, and scanline/dither effects. Switchable from the header without a page reload; preference is remembered in `localStorage`. Mana symbols always keep their canonical WUBRG colors regardless of theme — matching every real MTG product.
+The UI is a **Swiss / International-Brutalist** shell — monochrome paper-and-ink, 1px hairlines as the primary structure, hard corners throughout, and **one** sharp accent (international orange). No gradients, no rounded cards, no glassmorphism, no glow. Type is **Archivo** for everything display (wordmark, section heads, deck/card names) and **IBM Plex Mono** for every datum (values, labels, indices, set codes) — a machined, editorial feel. Card art and mana symbols always keep their canonical WUBRG colors regardless of theme, matching every real MTG product.
+
+Three built-in themes swap palette only (structure and type are identical):
+- **Paper** — light warm off-white, the default.
+- **Ink** — near-black dark mode.
+- **Blueprint** — dark deep-blue cyanotype.
+
+Switchable from the header without a page load; your choice is remembered in `localStorage` and the header wordmark echoes the active theme.
 
 ![Theme switcher open](docs/screenshots/05-theme-switcher.jpg)
 
-![Cybercore theme applied](docs/screenshots/06-theme-cybercore.jpg)
+![Ink theme applied](docs/screenshots/06-theme-ink.jpg)
 
 ---
 
@@ -101,7 +108,7 @@ A single-round mulligan drill. Pick a deck and hit **Deal hand**: the backend dr
 | Frontend | React + Vite + TypeScript, Tailwind v4 |
 | Charts | Hand-rolled SVG (mana curve + price history/sparklines) — no charting library |
 | Icons/symbols | `mana-font` (official-style WUBRG mana glyphs), `lucide-react` (UI icons) |
-| Typography | Cinzel (headings/wordmark), system sans-serif + Press Start 2P / VT323 (Cybercore) |
+| Typography | Archivo (display) + IBM Plex Mono (data), self-hosted via `@fontsource` |
 
 ## Running locally
 
