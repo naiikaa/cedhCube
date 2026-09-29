@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import {
-  ArrowLeft, ArrowLeftRight, Check, Crown, Filter, Layers,
+  ArrowLeft, ArrowLeftRight, Check, Filter, Layers,
   MinusCircle, PlusCircle, Swords, Trophy, X,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import type {
   Deck, MetaCompareCard, MetaCompareResult, MetaDeckOverview, MetaEntry,
-  MetaStockCard, MetaStockResult,
+  MetaStockCard, MetaStockResult, MyMetaCard,
 } from '../lib/types';
 import { ManaCost } from './ManaPip';
 import { CardImage, CardZoom, cropUrl, Spinner } from './UI';
+import { CommanderFrame } from './CommanderFrame';
+import { deckCommanders } from '../lib/deck';
 
 /** `2026-06-13T14:30:00.000Z` → `13 Jun 2026`; unparseable dates pass through. */
 const fmtDate = (iso: string) => {
@@ -120,10 +122,40 @@ function StockRow({ card, decksAnalyzed }: { card: MetaStockCard; decksAnalyzed:
   );
 }
 
+/** One of your own cards with how many analyzed meta decks also run it. */
+function MyCardRow({ card, decksAnalyzed }: { card: MyMetaCard; decksAnalyzed: number }) {
+  const offMeta = card.meta_count === 0;
+  const pct = Math.round(card.share * 100);
+  return (
+    <div className="card-row meta-stock-row">
+      <CardZoom url={card.image_url} name={card.name}>
+        <CardImage url={cropUrl(card.image_url)} name={card.name} size={34} style={{ borderRadius: 3 }} />
+      </CardZoom>
+      <span className="meta-stock-body">
+        <span className="meta-card-name">{card.name}</span>
+        {card.type ? <span className="meta-stock-type">{card.type}</span> : null}
+      </span>
+      <ManaCost cost={card.mana_cost} />
+      {card.quantity > 1 ? <span className="meta-qty">×{card.quantity}</span> : null}
+      <span
+        className={`meta-count meta-stock-badge${offMeta ? ' is-offmeta' : ''}`}
+        title={offMeta
+          ? 'None of the analyzed meta decks run this — candidate to cut'
+          : `${pct}% of analyzed decks`}
+      >
+        {card.meta_count}/{decksAnalyzed}
+      </span>
+    </div>
+  );
+}
+
 function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: string }) {
   const [onlyMissing, setOnlyMissing] = useState(false);
+  const [onlyOffMeta, setOnlyOffMeta] = useState(false);
   const missing = stock.stock.filter(c => !c.in_my_deck);
   const rows = onlyMissing ? missing : stock.stock;
+  const offMeta = stock.my_cards.filter(c => c.meta_count === 0);
+  const myRows = onlyOffMeta ? offMeta : stock.my_cards;
 
   if (stock.decks_analyzed === 0) {
     return (
@@ -189,6 +221,39 @@ function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: stri
           <div className="meta-card-list meta-stock-full">
             {rows.map(c => (
               <StockRow key={c.name} card={c} decksAnalyzed={stock.decks_analyzed} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="meta-section meta-section-mine">
+        <div className="section-head">
+          <h3>
+            <MinusCircle size={14} aria-hidden="true" />
+            Your cards vs the meta
+          </h3>
+          <button
+            type="button"
+            className="chip head-action"
+            aria-pressed={onlyOffMeta}
+            onClick={() => setOnlyOffMeta(v => !v)}
+          >
+            <Filter size={12} aria-hidden="true" />
+            Only show cards the meta doesn't play
+          </button>
+        </div>
+        <p className="meta-stock-offmeta-summary">
+          <span className="meta-stock-offmeta-num">{offMeta.length}</span> of {stock.my_cards.length} cards
+          you play are off-meta (no analyzed deck runs them)
+        </p>
+        {myRows.length === 0 ? (
+          <p className="meta-list-empty">
+            {onlyOffMeta ? 'Nothing — every card you run shows up in the meta.' : 'Nothing here.'}
+          </p>
+        ) : (
+          <div className="meta-card-list meta-stock-full">
+            {myRows.map(c => (
+              <MyCardRow key={c.name} card={c} decksAnalyzed={stock.decks_analyzed} />
             ))}
           </div>
         )}
@@ -343,9 +408,13 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
           </div>
 
           {selectedDeck && overview && (
-            <div className="meta-commander">
-              <Crown size={14} aria-hidden="true" />
-              <span className="meta-commander-name">{overview.commander || 'No commander set'}</span>
+            <div className="meta-commander" style={{ '--deck-color': selectedDeck.color } as CSSProperties}>
+              <CommanderFrame commanders={deckCommanders(selectedDeck)} color={selectedDeck.color}
+                identity={selectedDeck.color_identity} size="md" />
+              <span className="meta-commander-text">
+                <span className="meta-label">Commander · {selectedDeck.name}</span>
+                <span className="meta-commander-name">{overview.commander || 'No commander set'}</span>
+              </span>
               <span className="meta-count">{entries.length} entries</span>
             </div>
           )}

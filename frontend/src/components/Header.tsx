@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Check, Palette, Search } from 'lucide-react';
 import { useTheme, THEMES } from '../hooks/useTheme';
-import { ManaPip } from './ManaPip';
+import { CommanderFrame } from './CommanderFrame';
 import { CollectionValue } from './Price';
 import type { PriceSummary } from '../lib/types';
 
@@ -92,11 +92,12 @@ export function Header({ deckCount, uniqueCards, totalCards, priceSummary, onSea
       </div>
 
       <div className="header-brand">
+        {/* The brand mark is the system's chrome signature: an empty commander seat. */}
+        <span className="brand-mark" aria-hidden="true">
+          <CommanderFrame commanders={[]} color="var(--accent)" identity={BRAND_PIPS} size="sm" />
+        </span>
         {/* data-text feeds the cybercore theme's RGB-split glitch pseudo-elements. */}
         <h1 className="wordmark" data-text="cEDHcube">c<b>EDH</b>cube</h1>
-        <span className="brand-pips" aria-hidden="true">
-          {BRAND_PIPS.map(c => <ManaPip key={c} symbol={c} />)}
-        </span>
       </div>
 
       <div className="header-stats">

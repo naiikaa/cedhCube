@@ -190,6 +190,16 @@ export interface MetaStockCard {
   in_decks: string[];
 }
 
+export interface MyMetaCard {
+  name: string;
+  mana_cost: string;
+  image_url: string;
+  type: string;
+  quantity: number;
+  meta_count: number;
+  share: number;
+}
+
 export interface MetaStockResult extends MetaFilters {
   commander: string;
   deck_id: number;
@@ -198,6 +208,7 @@ export interface MetaStockResult extends MetaFilters {
   analyzed_entries: MetaStockEntryRef[];
   stock: MetaStockCard[];
   missed_count: number;
+  my_cards: MyMetaCard[];
 }
 
 export interface MulliganCard {

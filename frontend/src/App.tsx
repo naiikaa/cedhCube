@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
 import {
-  Check, CircleCheck, CircleX, Crown, Dices, ImageOff, Layers, LibraryBig, Pencil, RefreshCw,
-  Swords, Trash2, X,
+  Check, CircleCheck, CircleX, ClipboardList, Crown, Dices, ImageOff, Layers, Link, LibraryBig, Pencil, Plus,
+  RefreshCw, Swords, Trash2, X,
 } from 'lucide-react';
 import { api } from './lib/api';
 import type {
@@ -11,7 +11,9 @@ import { ColorIdentity } from './components/ColorIdentity';
 import { ManaCost, OracleText } from './components/ManaPip';
 import { FullManaCurve, MiniManaCurve } from './components/ManaCurve';
 import { Header } from './components/Header';
-import { CardImage, Spinner } from './components/UI';
+import { CardImage, Spinner, cropUrl } from './components/UI';
+import { CommanderFrame } from './components/CommanderFrame';
+import { deckCommanders, type CommanderPick } from './lib/deck';
 import { useToast, Toast } from './components/Toast';
 import { MetaTab } from './components/MetaTab';
 import { MulliganTab } from './components/MulliganTab';
@@ -43,19 +45,6 @@ const DEFAULT_DECK_COLOR = '#e94560';
 
 /** Single place that turns a rejected API promise into toast copy. */
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** One commander slot, in list order (slot 1 first). */
-type CommanderPick = { name: string; image: string };
-
-/**
- * A deck's commanders as a 0–2 entry list, so every surface can iterate instead
- * of branching on the two column pairs. Partner decks fill both slots.
- */
-const deckCommanders = (deck: Deck): CommanderPick[] =>
-  [
-    { name: deck.commander_name, image: deck.commander_image_url },
-    { name: deck.commander2_name, image: deck.commander2_image_url },
-  ].filter(c => !!c.name);
 
 // ─── App ───
 export default function App() {
@@ -104,6 +93,9 @@ export default function App() {
   const [moxUrl, setMoxUrl] = useState('');
   const [moxColor, setMoxColor] = useState(DEFAULT_DECK_COLOR);
   const [importing, setImporting] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addMode, setAddMode] = useState<'paste' | 'moxfield'>('paste');
+  const openAdd = () => { setAddMode('paste'); setAddOpen(true); };
 
   // ── Load ──
   const loadDecks = useCallback(() => {
@@ -184,7 +176,7 @@ export default function App() {
     try {
       const r = await api.createDeck(deckName.trim(), deckCards.trim(), deckColor);
       show(`"${r.name}" created (${r.results.length} cards)`, 'success');
-      setDeckName(''); setDeckCards(''); setDeckColor(DEFAULT_DECK_COLOR);
+      setDeckName(''); setDeckCards(''); setDeckColor(DEFAULT_DECK_COLOR); setAddOpen(false);
       loadDecks();
     } catch (e) { show(errText(e), 'error'); } finally { setCreating(false); }
   };
@@ -195,7 +187,7 @@ export default function App() {
     try {
       const r = await api.importMoxfield(moxUrl.trim(), moxColor);
       show(`"${r.name}" imported (${r.results.length} cards)`, 'success');
-      setMoxUrl(''); loadDecks(); setTimeout(() => pollImages(r.id), 2000);
+      setMoxUrl(''); setAddOpen(false); loadDecks(); setTimeout(() => pollImages(r.id), 2000);
     } catch (e) { show(errText(e), 'error'); } finally { setImporting(false); }
   };
 
@@ -343,47 +335,13 @@ export default function App() {
       {tab === 'decks' && (
         <div className="page">
 
-          {/* ─── Import ─── */}
-          <section className="frame frame-pad" style={{ marginBottom: '1.25rem' }}>
-            <div className="section-head">
-              <h3>Import from Moxfield</h3>
-            </div>
-            <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <input type="text" className="field" style={{ flex: 1, minWidth: 220, width: 'auto' }}
-                placeholder="https://moxfield.com/decks/…" value={moxUrl}
-                onChange={e => setMoxUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && importMox()} />
-              <input type="color" className="swatch-input" aria-label="Deck colour"
-                value={moxColor} onChange={e => setMoxColor(e.target.value)} />
-              <button type="button" className="btn" onClick={importMox} disabled={importing}>
-                {importing ? <Spinner size={14} inline /> : null}
-                {importing ? 'Importing…' : 'Import'}
-              </button>
-            </div>
-          </section>
-
-          {/* ─── Create ─── */}
-          <section className="frame frame-pad" style={{ marginBottom: '1.75rem' }}>
-            <div className="section-head">
-              <h3>New Deck</h3>
-            </div>
-            <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-              <input type="text" className="field" style={{ flex: 1, minWidth: 200, width: 'auto' }}
-                placeholder="Deck name" value={deckName} onChange={e => setDeckName(e.target.value)} />
-              <input type="color" className="swatch-input" aria-label="Deck colour"
-                value={deckColor} onChange={e => setDeckColor(e.target.value)} />
-            </div>
-            <textarea className="field mono" style={{ minHeight: 92, marginBottom: 10 }}
-              placeholder={'4 Lightning Bolt\n3x Counterspell\n1 Black Lotus (LEA)'}
-              value={deckCards} onChange={e => setDeckCards(e.target.value)} />
-            <button type="button" className="btn" onClick={createDeck} disabled={creating}>
-              {creating ? <Spinner size={14} inline /> : null}
-              {creating ? 'Validating…' : 'Create Deck'}
-            </button>
-          </section>
-
           {/* ─── Deck List ─── */}
           <div className="section-head">
             <h2>My Decks</h2>
+            <button type="button" className="btn head-action" onClick={() => openAdd()}>
+              <Plus aria-hidden="true" />
+              Add Deck
+            </button>
             <button type="button" className="btn-ghost head-action" onClick={refreshPrices} disabled={refreshingPrices}>
               <RefreshCw className={refreshingPrices ? 'spin' : undefined} aria-hidden="true" />
               Refresh Prices
@@ -397,56 +355,60 @@ export default function App() {
           {decksLoading ? (
             <div className="empty-state"><Spinner size={22} /></div>
           ) : decks.length === 0 ? (
-            <div className="empty-state">
-              <Layers aria-hidden="true" />
-              No decks yet — import one from Moxfield or paste a list above.
+            <div className="empty-state is-crafted">
+              <span className="empty-emblem" aria-hidden="true">
+                <CommanderFrame commanders={[]} size="lg" />
+              </span>
+              <h3 className="empty-title">No decks on the table</h3>
+              <p>Paste a decklist or import from Moxfield — your commander, curve and paper value land here.</p>
+              <button type="button" className="btn" onClick={() => openAdd()}>
+                <Plus size={14} aria-hidden="true" />
+                Add Deck
+              </button>
             </div>
           ) : (
             <div className="deck-list">
               {decks.map(deck => {
                 const cmds = deckCommanders(deck);
                 const value = deckValues.get(deck.id);
+                const hero = cmds.find(c => c.image)?.image;
                 return (
                 <button key={deck.id} type="button"
                   className="frame frame-hover deck-row"
                   style={{ '--deck-color': deck.color } as CSSProperties}
                   onClick={() => openDeck(deck)}
                 >
-                  {cmds.length > 1 ? (
-                    <span className="cmd-art-pair">
-                      {cmds.map(c => (c.image ? (
-                        <img key={c.name} className="cmd-art pair" src={c.image} alt="" loading="lazy" />
-                      ) : (
-                        <span key={c.name} className="cmd-placeholder pair"><Crown aria-hidden="true" /></span>
-                      )))}
-                    </span>
-                  ) : deck.commander_image_url ? (
-                    <img className="cmd-art" src={deck.commander_image_url} alt="" loading="lazy" />
-                  ) : (
-                    <span className="cmd-placeholder"><Crown aria-hidden="true" /></span>
+                  {hero && (
+                    <span className="deck-row-art" aria-hidden="true"
+                      style={{ backgroundImage: `url("${cropUrl(hero)}")` }} />
                   )}
+                  <CommanderFrame commanders={cmds} color={deck.color} identity={deck.color_identity} size="lg" />
 
-                  <span style={{ flex: 1, minWidth: 0, display: 'block' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                      <span className="deck-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deck.name}</span>
-                      <ColorIdentity identity={deck.color_identity} size="sm" />
-                    </span>
-                    {cmds.length > 0 && (
+                  <span className="deck-row-main">
+                    <span className="deck-name">{deck.name}</span>
+                    {cmds.length > 0 ? (
                       <span className="deck-commander">
                         <Crown aria-hidden="true" />
                         <span>{cmds.map(c => c.name).join(' // ')}</span>
                       </span>
+                    ) : (
+                      <span className="deck-commander is-unset">No commander set</span>
                     )}
-                    <MiniManaCurve stats={deckStats[deck.id] || null} />
+                    <span className="deck-row-foot">
+                      <ColorIdentity identity={deck.color_identity} size="sm" />
+                      <MiniManaCurve stats={deckStats[deck.id] || null} />
+                    </span>
                   </span>
 
-                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-                    {value && value.value > 0 && (
-                      <span className="deck-value">{fmtEur(value.value)}</span>
-                    )}
+                  <span className="deck-stats">
+                    {value && value.value > 0
+                      ? <span className="deck-value">{fmtEur(value.value)}</span>
+                      : <span className="deck-value is-empty">—</span>}
                     {value && <PriceDelta delta={value.delta_30d} />}
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{deck.card_count} cards</span>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{deck.total_cards} total</span>
+                    <span className="deck-count">
+                      {deck.card_count}<span className="deck-count-sep">/</span>{deck.total_cards}
+                    </span>
+                    <span className="stat-label">unique / total</span>
                   </span>
                 </button>
                 );
@@ -501,9 +463,26 @@ export default function App() {
 
           {/* Grid */}
           {filteredCollection.length === 0 ? (
-            <div className="empty-state">
-              <LibraryBig aria-hidden="true" />
-              {allCollection.length === 0 ? 'No cards yet — add a deck to build your collection.' : 'No cards match these filters.'}
+            <div className="empty-state is-crafted">
+              <span className="empty-emblem" aria-hidden="true"><LibraryBig /></span>
+              <h3 className="empty-title">{allCollection.length === 0 ? 'The binder is empty' : 'Nothing matches'}</h3>
+              <p>{allCollection.length === 0
+                ? 'Your collection is built from your decks — add one and every card is catalogued and priced.'
+                : 'No cards match these filters. Widen the type or deck selection.'}</p>
+              {allCollection.length === 0 ? (
+                <button type="button" className="btn" onClick={() => { switchTab('decks'); openAdd(); }}>
+                  <Plus size={14} aria-hidden="true" />
+                  Add Deck
+                </button>
+              ) : (
+                <button type="button" className="btn-ghost" onClick={() => {
+                  setTypeFilter('all'); setSearchQuery('');
+                  setEnabledDeckIds(Object.fromEntries(decks.map(d => [d.id, true])));
+                }}>
+                  <X size={14} aria-hidden="true" />
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : (
             <div className="card-grid">
@@ -556,17 +535,83 @@ export default function App() {
       {/* ═══════════════════ M U L L I G A N S   T A B ═══════════════════ */}
       {tab === 'mulligans' && <MulliganTab decks={decks} onError={showError} />}
 
+      {/* ═══════════════════ A D D   D E C K   M O D A L ═══════════════════ */}
+      {addOpen && (
+        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setAddOpen(false); }}>
+          <div className="modal-panel add-deck-modal" role="dialog" aria-modal="true" aria-label="Add deck"
+            style={{ maxWidth: 560, '--deck-color': addMode === 'paste' ? deckColor : moxColor } as CSSProperties}>
+            <div className="modal-head">
+              <div className="add-deck-title">
+                <CommanderFrame commanders={[]} color={addMode === 'paste' ? deckColor : moxColor} size="md" />
+                <div style={{ minWidth: 0 }}>
+                  <h2 className="modal-title">Add Deck</h2>
+                  <div className="modal-sub">
+                    {addMode === 'paste'
+                      ? 'One card per line. Commander is picked after import.'
+                      : 'Public Moxfield deck URL — commander and art come along.'}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="icon-btn bare" onClick={() => setAddOpen(false)} aria-label="Close"><X /></button>
+              </div>
+            </div>
+            <div className="segmented" role="tablist" aria-label="Add method" style={{ marginBottom: '1rem' }}>
+              <button type="button" role="tab" className="segmented-opt" aria-selected={addMode === 'paste'} onClick={() => setAddMode('paste')}>
+                <ClipboardList aria-hidden="true" /> Paste list
+              </button>
+              <button type="button" role="tab" className="segmented-opt" aria-selected={addMode === 'moxfield'} onClick={() => setAddMode('moxfield')}>
+                <Link aria-hidden="true" /> Import Moxfield
+              </button>
+            </div>
+            {addMode === 'paste' ? (
+              <div className="add-deck-form">
+                <div className="add-deck-row">
+                  <input type="text" className="field" autoFocus placeholder="Deck name" value={deckName}
+                    onChange={e => setDeckName(e.target.value)} />
+                  <input type="color" className="swatch-input" aria-label="Deck colour"
+                    value={deckColor} onChange={e => setDeckColor(e.target.value)} />
+                </div>
+                <textarea className="field mono" style={{ minHeight: 220 }}
+                  placeholder={'1 Thassa\'s Oracle\n1 Demonic Consultation\n1 Mana Crypt'}
+                  value={deckCards} onChange={e => setDeckCards(e.target.value)} />
+                <div className="add-deck-actions">
+                  <button type="button" className="btn-ghost" onClick={() => setAddOpen(false)}>Cancel</button>
+                  <button type="button" className="btn" onClick={createDeck} disabled={creating}>
+                    {creating ? <Spinner size={14} inline /> : null}
+                    {creating ? 'Validating…' : 'Create Deck'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="add-deck-form">
+                <div className="add-deck-row">
+                  <input type="text" className="field" autoFocus placeholder="https://moxfield.com/decks/…" value={moxUrl}
+                    onChange={e => setMoxUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && importMox()} />
+                  <input type="color" className="swatch-input" aria-label="Deck colour"
+                    value={moxColor} onChange={e => setMoxColor(e.target.value)} />
+                </div>
+                <div className="add-deck-actions">
+                  <button type="button" className="btn-ghost" onClick={() => setAddOpen(false)}>Cancel</button>
+                  <button type="button" className="btn" onClick={importMox} disabled={importing}>
+                    {importing ? <Spinner size={14} inline /> : null}
+                    {importing ? 'Importing…' : 'Import'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ═══════════════════ D E C K   M O D A L ═══════════════════ */}
       {modalDeck && (
         <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) closeModal(); }}>
-          <div className="modal-panel" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-label={modalDeck.name}>
+          <div className="modal-panel deck-modal" style={{ maxWidth: 720, '--deck-color': modalDeck.color } as CSSProperties} role="dialog" aria-modal="true" aria-label={modalDeck.name}>
             {/* Header */}
             <div className="modal-head">
               <div style={{ minWidth: 0 }}>
-                <h2 className="modal-title">
-                  <span className="deck-dot" style={{ background: modalDeck.color, width: 11, height: 11 }} />
-                  {modalDeck.name}
-                </h2>
+                <h2 className="modal-title">{modalDeck.name}</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 6 }}>
                   <span className="meta-label">Identity</span>
                   <ColorIdentity identity={modalCI} />
@@ -583,18 +628,14 @@ export default function App() {
             <FullManaCurve stats={modalStats} />
 
             {/* Commanders */}
-            <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {modalCommanders.length > 0
-                  ? modalCommanders.map(c => (c.image
-                    ? <img key={c.name} className="cmd-art sm" src={c.image} alt="" />
-                    : <span key={c.name} className="cmd-placeholder sm"><Crown aria-hidden="true" /></span>))
-                  : <span className="cmd-placeholder"><Crown aria-hidden="true" /></span>}
+            <div className="deck-modal-cmd">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <CommanderFrame commanders={modalCommanders} color={modalDeck.color} identity={modalCI} size="lg" />
                 <div style={{ minWidth: 0 }}>
                   <div className="meta-label">{modalCommanders.length > 1 ? 'Commanders' : 'Commander'}</div>
                   {modalCommanders.length > 0 ? (
                     modalCommanders.map(c => (
-                      <div key={c.name} className="display" style={{ fontSize: '0.9rem', color: 'var(--commander)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div key={c.name} className="t-serif deck-modal-cmd-name">
                         <Crown size={13} aria-hidden="true" />
                         {c.name}
                       </div>
@@ -620,7 +661,8 @@ export default function App() {
                     return (
                       <button key={c.id} type="button" className="picker-option" role="checkbox"
                         aria-checked={picked} onClick={() => toggleCommander(c)}>
-                        <CardImage url={c.image_url} name={c.card_name} size={24} />
+                        <CommanderFrame commanders={[{ name: c.card_name, image: c.image_url || '' }]}
+                          color={modalDeck.color} size="xs" active={picked} />
                         {c.card_name}
                         {picked && <Check size={14} aria-hidden="true" style={{ marginLeft: 'auto', flexShrink: 0 }} />}
                       </button>

@@ -707,6 +707,22 @@ def api_meta_stock(req: MetaStockRequest):
         })
     cards.sort(key=lambda c: (-c["count"], c["name"].lower()))
 
+    # Inverse view: every card you run and how many analyzed meta decks share it.
+    my_cards = []
+    for norm, row in my_by_name.items():
+        agg = stock.get(norm)
+        meta_count = agg["count"] if agg else 0
+        my_cards.append({
+            "name": row["card_name"],
+            "mana_cost": row.get("mana_cost") or "",
+            "image_url": row.get("image_url") or "",
+            "type": row.get("type_line") or "",
+            "quantity": row.get("quantity") or 1,
+            "meta_count": meta_count,
+            "share": meta_count / decks_analyzed if decks_analyzed else 0.0,
+        })
+    my_cards.sort(key=lambda c: (c["meta_count"], c["name"].lower()))
+
     return {
         "commander": key,
         "deck_id": req.deck_id,
@@ -717,6 +733,7 @@ def api_meta_stock(req: MetaStockRequest):
         "analyzed_entries": analyzed,
         "stock": cards,
         "missed_count": sum(1 for c in cards if not c["in_my_deck"]),
+        "my_cards": my_cards,
     }
 
 
