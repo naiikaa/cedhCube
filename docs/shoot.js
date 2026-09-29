@@ -89,19 +89,28 @@ const OUT = '/home/npopkov/magic-collection/docs/screenshots';
   await shoot(p, '09-card-detail-modal');
   await p.close();
 
-  // 10 — Meta tab
+  // 10 — Meta tab (RogSil deck selected); poll until entries render (edhtop16
+  // can transiently return empty — retry, don't screenshot the empty state)
   p = await mkPage('paper');
   await p.goto(BASE, { waitUntil: 'networkidle' });
   await p.click('.tab:has-text("Meta")');
-  await p.waitForTimeout(3500);
+  await p.waitForTimeout(2500);
+  await p.selectOption('#meta-deck-select', '14'); // [cEDH] RogSil
+  for (let i = 0; i < 10; i++) {
+    const n = await p.locator('.meta-entry').count();
+    if (n > 0) break;
+    await p.waitForTimeout(1500);
+  }
   await shoot(p, '10-meta-tab');
   await p.close();
 
-  // 11 — Mulligans tab (pick first deck, deal a hand)
+  // 11 — Mulligans tab (deal a hand first so the round renders)
   p = await mkPage('paper');
   await p.goto(BASE, { waitUntil: 'networkidle' });
   await p.click('.tab:has-text("Mulligans")');
   await p.waitForTimeout(2500);
+  await p.click('.mulligan-actions .chip:has-text("Deal hand")');
+  await p.waitForTimeout(3000);
   await shoot(p, '11-mulligans-tab');
   await p.close();
 
