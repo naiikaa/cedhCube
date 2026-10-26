@@ -1523,6 +1523,109 @@ button.mulligan-card:hover .mulligan-card-name { color: var(--accent); }
   color: var(--bg);
 }
 
+/* ═══ Artwork — one hairline row per card; per illustration, every printing side by side ═══ */
+.art-rows { display: flex; flex-direction: column; border-top: 1px solid var(--rule); }
+.art-row { padding: 16px 0 18px; border-bottom: 1px solid var(--rule-soft); }
+.art-row-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.art-row-name { font-weight: 700; font-size: 15px; letter-spacing: -0.005em; }
+.art-row-meta, .art-row-note, .art-artist, .art-group-count, .art-print-id, .art-finish {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+.art-row-meta { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.art-row-note { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 11px; color: var(--muted); }
+.art-row-note.is-error { color: var(--error); }
+.art-row-note .btn-ghost { padding: 5px 10px; font-size: 10px; }
+.art-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x proximity;
+}
+/* Reserve a printing's height so rows don't jump as their artworks land. */
+.art-strip.is-pending { align-items: center; justify-content: center; min-height: 280px; border: 1px dashed var(--rule-soft); }
+/* One illustration: hairline frame around its printings, artist across the top. */
+.art-group {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule-soft);
+  scroll-snap-align: start;
+}
+.art-group.is-owned { border-color: var(--accent); }
+.art-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.art-artist {
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.art-group-count { font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.art-group-prints { display: flex; gap: 8px; padding: 8px; }
+.art-print-card {
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border: 1px solid transparent;
+}
+.art-print-card.is-owned { border-color: var(--accent); }
+.art-print-img { position: relative; display: block; }
+/* Over card art the hairline "off" badge needs a paper backing to stay legible. */
+.art-print-img .foil-badge.off { background: var(--bg); color: var(--muted); }
+.art-print-img img { display: block; width: 100%; height: auto; aspect-ratio: 488 / 680; }
+.art-print-img .foil-badge.corner { top: 6px; right: 6px; }
+.art-print-img .qty-badge { top: 6px; left: 6px; }
+.art-print-body { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 6px 2px 2px; }
+.art-print-id { display: flex; align-items: baseline; gap: 5px; font-size: 10px; }
+.art-print-set { font-weight: 600; }
+.art-print-num { color: var(--muted); }
+.art-print-year { margin-left: auto; color: var(--faint); }
+.art-finishes { display: flex; flex-wrap: wrap; gap: 3px; }
+/* Finish tags: hairline = exists, filled ink = you own that finish. */
+.art-finish {
+  padding: 0 4px;
+  border: 1px solid var(--rule-soft);
+  color: var(--muted);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 14px;
+}
+.art-finish.is-owned { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 600; }
+/* Shop link: hairline bar under each printing, ink inversion on hover like every button. */
+.art-buy {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: auto;
+  padding: 4px 6px;
+  border: 1px solid var(--rule-soft);
+  color: var(--ink);
+  font-family: var(--font-data);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.art-buy svg { width: 11px; height: 11px; flex-shrink: 0; }
+.art-buy-arrow { margin-left: auto; }
+.art-buy:hover { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+/* No exact product known: a name search — dashed and muted so it reads as weaker. */
+.art-buy.is-search { border-style: dashed; color: var(--muted); }
+
 /* ═══ Mobile ═══ */
 @media (max-width: 900px) {
   .mast-stats { margin-left: 0; width: 100%; order: 3; }

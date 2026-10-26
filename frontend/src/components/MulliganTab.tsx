@@ -111,7 +111,7 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
   return (
     <div className="page">
       <div className="section-head">
-        <span className="sec-idx">04</span>
+        <span className="sec-idx">05</span>
         <h2>Mulligans</h2>
         <span className="head-action head-note">
           one round · random ship quota · pod from edhtop16's top list
@@ -199,7 +199,7 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
 
               <section className="mulligan-pod">
                 <div className="section-head">
-                  <span className="sec-idx">04.1</span>
+                  <span className="sec-idx">05.1</span>
                   <h3>Your pod</h3>
                   <span className="head-action meta-count">{deal.enemies.length} opponents</span>
                 </div>
@@ -223,7 +223,7 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
                 <>
                   <section className="mulligan-kept">
                     <div className="section-head">
-                      <span className="sec-idx">04.2</span>
+                      <span className="sec-idx">05.2</span>
                       <h3>Kept hand</h3>
                       <span className="head-action meta-count">{kept.length} cards</span>
                     </div>
@@ -237,7 +237,7 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
                   {binned.length > 0 && (
                     <section className="mulligan-bin">
                       <div className="section-head">
-                        <span className="sec-idx">04.3</span>
+                        <span className="sec-idx">05.3</span>
                         <h3>Shipped</h3>
                         <span className="head-action meta-count">{binned.length} cards</span>
                       </div>
@@ -252,7 +252,7 @@ export function MulliganTab({ decks, onError }: MulliganTabProps) {
               ) : (
                 <section className="mulligan-hand">
                   <div className="section-head">
-                    <span className="sec-idx">04.2</span>
+                    <span className="sec-idx">05.2</span>
                     <h3>Opening hand</h3>
                     <span className="head-action meta-count">
                       {shipCount === 0 ? 'Lock to keep all 7' : 'Click cards to ship them'}

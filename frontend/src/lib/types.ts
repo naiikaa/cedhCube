@@ -71,6 +71,40 @@ export interface CardDetail {
   price_eur_foil?: number | null;
 }
 
+/** Scryfall finish names; `etched` is a foil-etched printing. */
+export type CardFinish = 'nonfoil' | 'foil' | 'etched';
+
+export interface ArtworkPrinting {
+  scryfall_id: string;
+  set_code: string;
+  set_name: string;
+  collector_number: string;
+  released_at: string;
+  finishes: CardFinish[];
+  image_url: string;
+  /** Cardmarket product page, or a name search when `cardmarket_exact` is false; '' if none. */
+  cardmarket_url: string;
+  cardmarket_exact: boolean;
+  /** Finishes of this printing held anywhere in the collection. */
+  owned_finishes: ('foil' | 'nonfoil')[];
+}
+
+/** One distinct illustration and every paper printing that carries it. */
+export interface Artwork {
+  illustration_id: string;
+  artist: string;
+  printings: ArtworkPrinting[];
+  /** Any printing of this art comes foil or foil-etched. */
+  has_foil: boolean;
+  owned: boolean;
+}
+
+export interface CardArtworks {
+  oracle_id: string;
+  name: string;
+  artworks: Artwork[];
+}
+
 /** Window labels shared by the price charts, mirroring the Meta tab's language. */
 export type PriceWindow = '30D' | '90D' | '1Y' | 'ALL';
 

@@ -15,11 +15,12 @@ from database import (
     update_deck_color, update_deck_commander,
     get_cards_missing_images, update_card_image,
     get_decks_missing_commander_images, update_deck_commander_image,
-    get_deck_cmc_distribution,
+    get_deck_cmc_distribution, get_owned_finishes,
     save_prices, get_price_summary, get_collection_history, get_card_history,
 )
 from scryfall import (parse_card_list, validate_and_resolve_card, lookup_card,
-                      fetch_card_detail, fetch_card_images_bulk, fetch_cards_bulk)
+                      fetch_card_detail, fetch_card_images_bulk, fetch_cards_bulk,
+                      fetch_artworks)
 from moxfield import fetch_moxfield_deck, extract_deck_id
 from prices import refresh_prices_async, start_price_daemon
 from edhtop16 import (clamp_filters, commander_key, get_commander_entries,
@@ -450,6 +451,30 @@ def api_card_details(scryfall_id: str = "", card_name: str = ""):
     # the stored row fresh, but leave the daily history point alone.
     save_prices({scryfall_id: (detail["price_eur"], detail["price_eur_foil"])}, snapshot=False)
     return detail
+
+@app.get("/api/artwork")
+def api_artwork(scryfall_id: str = ""):
+    """Every official paper artwork of an owned card, with its printings' finishes
+    and which of them (and in which finish) the collection holds."""
+    if not scryfall_id:
+        return JSONResponse({"error": "scryfall_id required"}, status_code=400)
+    try:
+        data = fetch_artworks(scryfall_id)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    owned = get_owned_finishes()
+    artworks = []
+    for art in data["artworks"]:
+        printings = [{**p, "owned_finishes": sorted(owned.get(p["scryfall_id"], ()))}
+                     for p in art["printings"]]
+        artworks.append({
+            **art,
+            "printings": printings,
+            "has_foil": any(f in p["finishes"] for p in printings for f in ("foil", "etched")),
+            "owned": any(p["owned_finishes"] for p in printings),
+        })
+    return {"oracle_id": data["oracle_id"], "name": data["name"], "artworks": artworks}
 
 # ─── Prices ───
 

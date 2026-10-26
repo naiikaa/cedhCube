@@ -544,6 +544,22 @@ def get_collection_scryfall_ids():
         conn.close()
 
 
+def get_owned_finishes():
+    """{scryfall_id: {"foil", "nonfoil"} subset} — which finish of each printing is owned."""
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT DISTINCT scryfall_id, is_foil FROM deck_cards
+            WHERE scryfall_id IS NOT NULL AND scryfall_id != ''
+        """).fetchall()
+        owned = {}
+        for r in rows:
+            owned.setdefault(r["scryfall_id"], set()).add("foil" if r["is_foil"] else "nonfoil")
+        return owned
+    finally:
+        conn.close()
+
+
 def save_prices(prices, snapshot=True):
     """Write {scryfall_id: (eur, eur_foil)} onto the card rows and, by default,
     append today's history point. Ids absent from `prices` keep their cached

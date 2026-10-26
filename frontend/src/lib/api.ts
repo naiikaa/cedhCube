@@ -1,5 +1,5 @@
 import type {
-  CardHistory, CollectionHistory, MetaCompareResult, MetaDeckOverview, MetaStockResult,
+  CardArtworks, CardHistory, CollectionHistory, MetaCompareResult, MetaDeckOverview, MetaStockResult,
   MulliganDeal, PriceSummary, PriceWindow,
 } from './types';
 
@@ -69,6 +69,8 @@ export const api = {
   getCollection: () => request<import('./types').CollectionCard[]>('/collection'),
   getCardDetails: (scryfallId: string) =>
     request<import('./types').CardDetail>(`/cards/details?scryfall_id=${encodeURIComponent(scryfallId)}`),
+  getArtworks: (scryfallId: string) =>
+    request<CardArtworks>(`/artwork?scryfall_id=${encodeURIComponent(scryfallId)}`),
 
   // Prices
   getPriceSummary: () => request<PriceSummary>('/prices/summary'),

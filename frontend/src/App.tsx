@@ -17,12 +17,14 @@ import { deckCommanders, type CommanderPick } from './lib/deck';
 import { useToast, Toast } from './components/Toast';
 import { MetaTab } from './components/MetaTab';
 import { MulliganTab } from './components/MulliganTab';
+import { ArtworkTab } from './components/ArtworkTab';
 import { CardPrice, PriceBox, PriceDelta, fmtEur } from './components/Price';
 import { CardSparkline, ValueHistoryPanel } from './components/PriceChart';
 
 const TABS = [
   { value: 'decks', label: 'Decks' },
   { value: 'collection', label: 'Collection' },
+  { value: 'artwork', label: 'Artwork' },
   { value: 'meta', label: 'Meta' },
   { value: 'mulligans', label: 'Mulligans' },
 ] as const;
@@ -548,6 +550,9 @@ export default function App() {
           )}
         </div>
       )}
+
+      {/* ═══════════════════ A R T W O R K   T A B ═══════════════════ */}
+      {tab === 'artwork' && <ArtworkTab cards={allCollection} />}
 
       {/* ═══════════════════ M E T A   T A B ═══════════════════ */}
       {tab === 'meta' && <MetaTab decks={decks} onError={showError} />}

@@ -114,6 +114,15 @@ const OUT = '/home/npopkov/magic-collection/docs/screenshots';
   await shoot(p, '11-mulligans-tab');
   await p.close();
 
+  // 12 — Artwork tab, filtered to a card with many illustrations; wait for the strip
+  p = await mkPage('paper');
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await p.click('.tab:has-text("Artwork")');
+  await p.fill('input[aria-label="Search artwork"]', 'Ad Nauseam');
+  await p.waitForSelector('.art-print-card', { timeout: 30000 });
+  await shoot(p, '12-artwork-tab');
+  await p.close();
+
   await browser.close();
   console.log('ALL DONE');
 })().catch(e => { console.error('ERR', e); process.exit(1); });

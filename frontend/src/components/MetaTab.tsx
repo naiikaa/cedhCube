@@ -182,7 +182,7 @@ function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: stri
 
       <section className="meta-section meta-section-missing">
         <div className="section-head">
-          <span className="sec-idx">03.1</span>
+          <span className="sec-idx">04.1</span>
           <h3>You're missing these</h3>
           <span className="head-action meta-count">{missing.length}</span>
         </div>
@@ -199,7 +199,7 @@ function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: stri
 
       <section className="meta-section">
         <div className="section-head">
-          <span className="sec-idx">03.2</span>
+          <span className="sec-idx">04.2</span>
           <h3>Full stock list</h3>
           <button
             type="button"
@@ -224,7 +224,7 @@ function StockView({ stock, deckName }: { stock: MetaStockResult; deckName: stri
 
       <section className="meta-section meta-section-mine">
         <div className="section-head">
-          <span className="sec-idx">03.3</span>
+          <span className="sec-idx">04.3</span>
           <h3>Your cards vs the meta</h3>
           <button
             type="button"
@@ -334,7 +334,7 @@ export function MetaTab({ decks, onError }: MetaTabProps) {
   return (
     <div className="page">
       <div className="section-head">
-        <span className="sec-idx">03</span>
+        <span className="sec-idx">04</span>
         <h2>Meta</h2>
         <span className="head-action head-note">
           edhtop16 · top results, {periodLabel.toLowerCase()}, events {minEventSize}+

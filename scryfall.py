@@ -1,7 +1,9 @@
 """Scryfall API helpers for card validation and image lookup."""
 import requests
+import threading
 import time
 import re
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 SCRYFALL_SEARCH = "https://api.scryfall.com/cards/named"
 SCRYFALL_CARD = "https://api.scryfall.com/cards/"
@@ -20,6 +22,38 @@ HEADERS = {
 INTERACTIVE_DELAY = 0.1
 BULK_DELAY = 0.5
 RATE_LIMIT_BACKOFF = 30
+
+
+class _Pacer:
+    """Thread-safe minimum spacing between requests to one Scryfall rate bucket.
+
+    FastAPI runs sync routes on a thread pool, so concurrent artwork requests
+    from the browser must queue here rather than burst past the hard limits
+    (https://scryfall.com/docs/api/rate-limits).
+    """
+
+    def __init__(self, interval):
+        self._interval = interval
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def wait(self):
+        with self._lock:
+            now = time.monotonic()
+            if now < self._next:
+                time.sleep(self._next - now)
+                now = self._next
+            self._next = now + self._interval
+
+
+_search_pacer = _Pacer(0.5)   # /cards/search: 2 requests/second
+_card_pacer = _Pacer(0.1)     # /cards/:id: 10 requests/second
+
+# Printings only change when a set releases; a day-long cache keeps repeat
+# visits to the Artwork tab off the network. scryfall_id → oracle_id never changes.
+_ARTWORK_TTL = 24 * 60 * 60
+_artwork_cache: dict = {}
+_oracle_ids: dict = {}
 
 
 def lookup_card(name, set_code=None):
@@ -260,3 +294,122 @@ def fetch_card_detail(scryfall_id):
         "rulings": rulings,
         **get_prices(card),
     }
+
+
+def _oracle_id(scryfall_id):
+    cached = _oracle_ids.get(scryfall_id)
+    if cached:
+        return cached
+    _card_pacer.wait()
+    try:
+        resp = requests.get(SCRYFALL_CARD + scryfall_id, headers=HEADERS, timeout=10)
+    except requests.RequestException as e:
+        raise RuntimeError(f"Scryfall unreachable: {e}") from e
+    if resp.status_code != 200:
+        raise RuntimeError(f"Scryfall card lookup failed ({resp.status_code})")
+    card = resp.json()
+    # Reversible cards carry oracle_id on their faces only.
+    oracle_id = card.get("oracle_id") or (card.get("card_faces") or [{}])[0].get("oracle_id")
+    if not oracle_id:
+        raise RuntimeError("Scryfall card has no oracle id")
+    _oracle_ids[scryfall_id] = oracle_id
+    return oracle_id
+
+
+def _paper_printings(oracle_id):
+    """Every English paper printing of a card, oldest first, across all pages."""
+    printings = []
+    url = SCRYFALL_CARD_SEARCH
+    params = {"q": f"oracleid:{oracle_id} game:paper", "unique": "prints",
+              "order": "released", "dir": "asc"}
+    while url:
+        _search_pacer.wait()
+        try:
+            resp = requests.get(url, params=params, headers=HEADERS, timeout=20)
+        except requests.RequestException as e:
+            raise RuntimeError(f"Scryfall unreachable: {e}") from e
+        if resp.status_code == 404:
+            break           # search answers 404 for zero matches: digital-only card
+        if resp.status_code != 200:
+            raise RuntimeError(f"Scryfall printing search failed ({resp.status_code})")
+        page = resp.json()
+        printings.extend(page.get("data", []))
+        # next_page already carries the query string.
+        url, params = (page.get("next_page"), None) if page.get("has_more") else (None, None)
+    return printings
+
+
+def _front(card):
+    """The face that carries the printed art: front face for multi-image layouts."""
+    faces = card.get("card_faces") or []
+    return faces[0] if faces and "image_uris" in faces[0] else card
+
+
+def _cardmarket_url(card):
+    """Scryfall's Cardmarket link with its referral params removed.
+
+    Cardmarket's Cloudflare rules hard-block requests carrying Scryfall's
+    `utm_*` params ("Sorry, you have been blocked"), so only the parameters
+    that pick the page (`idProduct` / `searchString`) survive.
+    """
+    url = (card.get("purchase_uris") or {}).get("cardmarket", "")
+    if not url:
+        return ""
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query)
+             if k != "referrer" and not k.startswith("utm_")]
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+def fetch_artworks(scryfall_id):
+    """Every official paper artwork of the card one printing belongs to.
+
+    Printings are grouped by the front face's Scryfall `illustration_id`, so a
+    reprint with the same art in a new frame lands in the same group. Returns
+    {"oracle_id", "name", "artworks": [{"illustration_id", "artist",
+    "printings": [{"scryfall_id", "set_code", "set_name", "collector_number",
+    "released_at", "finishes", "image_url", "cardmarket_url",
+    "cardmarket_exact"}]}]}; artworks and their printings
+    are ordered by first release. Raises RuntimeError when Scryfall fails.
+    """
+    oracle_id = _oracle_id(scryfall_id)
+    cached = _artwork_cache.get(oracle_id)
+    now = time.time()
+    if cached and now - cached[0] < _ARTWORK_TTL:
+        return cached[1]
+
+    printings = _paper_printings(oracle_id)
+    groups = {}
+    for card in printings:
+        front = _front(card)
+        # A handful of printings predate Scryfall's art tagging; keep each of
+        # those as its own artwork rather than merging unrelated scans.
+        key = front.get("illustration_id") or card.get("illustration_id") or card["id"]
+        group = groups.get(key)
+        if group is None:
+            group = groups[key] = {
+                "illustration_id": key,
+                "artist": front.get("artist") or card.get("artist") or "",
+                "printings": [],
+            }
+        group["printings"].append({
+            "scryfall_id": card["id"],
+            "set_code": card.get("set", ""),
+            "set_name": card.get("set_name", ""),
+            "collector_number": card.get("collector_number", ""),
+            "released_at": card.get("released_at", ""),
+            "finishes": card.get("finishes") or [],
+            "image_url": get_image_url(card),
+            # The exact product page when Scryfall knows the Cardmarket product
+            # id, otherwise a name search on Cardmarket.
+            "cardmarket_url": _cardmarket_url(card),
+            "cardmarket_exact": bool(card.get("cardmarket_id")),
+        })
+
+    result = {
+        "oracle_id": oracle_id,
+        "name": printings[0].get("name", "") if printings else "",
+        "artworks": list(groups.values()),
+    }
+    _artwork_cache[oracle_id] = (now, result)
+    return result

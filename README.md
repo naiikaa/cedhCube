@@ -1,6 +1,6 @@
 # cEDHcube
 
-A clean, artsy, single-page app for tracking Magic: The Gathering Commander decks, your card collection across them, and how those decks stack up against the competitive meta. Built with a **FastAPI** backend and a **React + Vite + TypeScript + Tailwind** frontend, with live data from Scryfall, Moxfield, and a EUR paper-value engine.
+A clean, artsy, single-page app for tracking Magic: The Gathering Commander decks, your card collection across them, every official artwork your cards were ever printed with, and how those decks stack up against the competitive meta. Built with a **FastAPI** backend and a **React + Vite + TypeScript + Tailwind** frontend, with live data from Scryfall, Moxfield, and a EUR paper-value engine.
 
 This README is a visual tour of every major screen and feature.
 
@@ -81,6 +81,14 @@ Clicking any card in the Collection tab opens a detail view: full card art, a **
 
 ---
 
+## Artwork tab
+
+Every card in your collection gets a row with **every official artwork it was ever printed with**: all English paper printings from Scryfall (digital-only MTGO/Arena printings excluded), grouped by illustration and headed by the artist. Inside each artwork group every printing — each border, frame and treatment — sits **side by side** as its own card image, labelled with set code, collector number and year, a corner badge saying whether that printing comes in **Foil**, and its exact finishes (**Non-foil**, **Foil**, **Etched**). Printings you own are outlined in the accent colour with an **Owned** badge, and the finish you hold is filled in. A **Cardmarket ↗** bar under each printing opens its Cardmarket product page in a new tab; the rare printings Scryfall can't map to a Cardmarket product get a dashed **Search CM** bar that opens a Cardmarket name search instead. Rows load lazily as you scroll (a few at a time, paced under Scryfall's 2 req/s search limit) and are cached server-side for a day.
+
+![Artwork tab](docs/screenshots/12-artwork-tab.jpg)
+
+---
+
 ## Meta tab
 
 Pick a deck and see how its commander(s) are performing on **edhtop16** — real cEDH tournament results live from the competitive meta. The toolbar lets you choose the deck, how many top decks to pull, the time window (3 months / 1 month / 6 months / 1 year / post-ban / all time) and a minimum event size; the overview lists recent top placements (standing, player, tournament, wins). Click an entry to open a **three-column side-by-side comparison** against your own list — *Meta plays, you don't* / *You play, meta doesn't* / *In both* — with `art_crop` card thumbnails and a hover full-card preview. A **Meta stock list** view aggregates what every analyzed top-N deck runs, flags the cards you're missing, and lets you toggle *only show what I'm missing*.
@@ -102,7 +110,7 @@ A single-round mulligan drill. Pick a deck and hit **Deal hand**: the backend dr
 | Layer | Stack |
 |---|---|
 | Backend | FastAPI + SQLite, single `app.py` route file, `database.py` for all SQL |
-| Card data | Scryfall API (lookup, images, localization, rulings, prices) |
+| Card data | Scryfall API (lookup, images, printings/artworks, localization, rulings, prices) |
 | Deck import | Moxfield API (via `cloudscraper` to get past its Cloudflare challenge) |
 | Meta data | edhtop16 GraphQL API (competitive cEDH results, proxied server-side) |
 | Frontend | React + Vite + TypeScript, Tailwind v4 |
